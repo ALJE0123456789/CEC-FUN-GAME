@@ -100,25 +100,23 @@ class LobbyScene extends Phaser.Scene {
 
         // JOIN SECTION
         this.add.text(512, 350, 'OR JOIN A FRIEND', { fontSize: '24px', fill: '#bdc3c7' }).setOrigin(0.5);
-        
-        // HTML Input for Room Code (Easier than Phaser Text Input)
-        let inputDiv = document.createElement('div');
-        inputDiv.innerHTML = `<input type="text" id="roomCodeInput" placeholder="Enter Room Code" style="padding: 15px; font-size: 20px; text-align: center; margin-top: 350px; border-radius: 10px; border: none;">`;
-        inputDiv.style.position = 'absolute'; inputDiv.style.top = '20%'; inputDiv.style.left = '50%'; inputDiv.style.transform = 'translate(-50%, -50%)';
-        this.add.dom(512, 400, inputDiv).setOrigin(0.5);
 
-        let joinBtn = this.add.text(512, 460, 'JOIN GAME', { fontSize: '30px', fill: '#fff', backgroundColor: '#3498db', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
+        // 👇 REPLACED THE HTML INPUT WITH A SIMPLE PROMPT BUTTON 👇
+        let joinBtn = this.add.text(512, 430, 'JOIN GAME', { fontSize: '30px', fill: '#fff', backgroundColor: '#3498db', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
+        
         joinBtn.on('pointerdown', () => {
-            let code = document.getElementById('roomCodeInput').value;
-            if(code) this.joinGame(code);
+            // This will pop up a native keyboard/alert box for them to type the code!
+            let code = prompt("Enter the Room Code from your friend (e.g., FIGHT-X7Y2B):");
+            if (code) {
+                this.joinGame(code.trim().toUpperCase());
+            }
         });
 
-        this.statusText = this.add.text(512, 550, '', { fontSize: '20px', fill: '#f1c40f' }).setOrigin(0.5);
+        this.statusText = this.add.text(512, 520, '', { fontSize: '20px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
     }
 
     hostGame() {
         this.statusText.setText("Generating Room Code...");
-        // Generate a random 5-letter code
         roomCode = "FIGHT-" + Math.random().toString(36).substring(2, 7).toUpperCase();
         
         peer = new Peer(roomCode);
@@ -138,20 +136,25 @@ class LobbyScene extends Phaser.Scene {
     }
 
     joinGame(code) {
-        this.statusText.setText("Connecting...");
-        peer = new Peer(); // Guest gets random ID
+        this.statusText.setText("Connecting... Please wait.");
+        peer = new Peer(); 
         isHost = false;
 
         peer.on('open', () => {
-            conn = peer.connect(code.toUpperCase());
+            // Connect to the host's room code
+            conn = peer.connect(code);
             
             conn.on('open', () => {
                 this.statusText.setText("Connected to Host!");
-                this.scene.start('CharSelectScene', { mode: 'online' });
+                setTimeout(() => {
+                    this.scene.start('CharSelectScene', { mode: 'online' });
+                }, 500);
             });
 
-            conn.on('error', (err) => {
-                this.statusText.setText("Failed to connect. Check code.");
+            // Catch connection errors (like wrong code)
+            peer.on('error', (err) => {
+                console.log(err);
+                this.statusText.setText("Failed to connect. Check code and try again.");
             });
         });
     }
