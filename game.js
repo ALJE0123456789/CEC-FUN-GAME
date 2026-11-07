@@ -411,21 +411,26 @@ class GameScene extends Phaser.Scene {
         this.tweens.add({ targets: txt, y: sprite.y - 200, alpha: 0, duration: 1200, onComplete: () => txt.destroy() });
     }
 
-    endGame(winner) {
-        this.isGameOver = true; this.player.setVelocityX(0); this.enemy.setVelocityX(0);
+            endGame(winner) {
+        this.isGameOver = true; 
+        this.player.setVelocityX(0); 
+        this.enemy.setVelocityX(0);
         
-        if (this.fightMusic) this.fightMusic.stop();
-        
-        // 👇 REPLACE THE SOUND LOGIC WITH THIS 👇
-        if (winner === 'PLAYER') {
-            if (!this.sound.mute && this.cache.audio.exists('sfx_win')) {
-                this.sound.play('sfx_win', { volume: 0.8 });
+        // Stop fight music safely
+        try {
+            if (this.fightMusic) this.fightMusic.stop();
+        } catch (e) { console.log("Audio error:", e); }
+
+        // Play Win/Lose sound safely
+        try {
+            if (!this.sound.mute) {
+                if (winner === 'PLAYER' && this.cache.audio.exists('sfx_win')) {
+                    this.sound.play('sfx_win', { volume: 0.8 });
+                } else if (winner === 'ENEMY' && this.cache.audio.exists('sfx_lose')) {
+                    this.sound.play('sfx_lose', { volume: 0.8 });
+                }
             }
-        } else {
-            if (!this.sound.mute && this.cache.audio.exists('sfx_lose')) {
-                this.sound.play('sfx_lose', { volume: 0.8 });
-            }
-        }
+        } catch (e) { console.log("Audio error:", e); }
 
         const winTexts = { 
             'aadhil': "Aadhil wins! The ESP32 short-circuited the competition.", 
@@ -453,25 +458,39 @@ class GameScene extends Phaser.Scene {
         this.add.text(512, 230, funnyText, { fontSize: '24px', fill: '#2ecc71', fontStyle: 'italic', wordWrap: { width: 800 } }).setOrigin(0.5);
         this.add.text(512, 280, loserText, { fontSize: '20px', fill: '#e74c3c', wordWrap: { width: 800 } }).setOrigin(0.5);
         
-          let exitBtn = this.add.text(512, 460, 'CHANGE CHARACTERS', { fontSize: '24px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } }).setOrigin(0.5).setInteractive();
+        // --- REPLAY BUTTON ---
+        let replayBtn = this.add.text(512, 380, 'REPLAY', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
+        
+        replayBtn.on('pointerdown', () => { 
+            // FORCE STOP both sounds by their key names
+            this.sound.stopByKey('sfx_win');
+            this.sound.stopByKey('sfx_lose');
+            
+            // Restart the scene
+            this.scene.restart({ p1: this.p1Name, p2: this.p2Name, diff: this.difficulty }); 
+        });
+        
+        // --- EXIT BUTTON ---
+        let exitBtn = this.add.text(512, 460, 'CHANGE CHARACTERS', { fontSize: '24px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } }).setOrigin(0.5).setInteractive();
+        
         exitBtn.on('pointerdown', () => { 
-            // Restart menu music before going back!
+            // FORCE STOP both sounds by their key names
+            this.sound.stopByKey('sfx_win');
+            this.sound.stopByKey('sfx_lose');
+            
+            // Restart the menu music
             if (this.cache.audio.exists('bgm_menu')) {
                 let menuMusic = this.sound.get('bgm_menu');
                 if (!menuMusic) {
                     menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
                 }
-                menuMusic.play();
+                if (!menuMusic.isPlaying) {
+                    menuMusic.play();
+                }
             }
+            
+            // Go back to character select
             this.scene.start('CharSelectScene'); 
-        });
-
-        // 👇 ALSO UPDATE THE REPLAY BUTTON TO STOP FIGHT MUSIC 👇
-        let replayBtn = this.add.text(512, 380, 'REPLAY', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
-        replayBtn.on('pointerdown', () => { 
-            let fightMusic = this.sound.get('bgm_fight');
-            if (fightMusic && fightMusic.isPlaying) fightMusic.stop();
-            this.scene.restart({ p1: this.p1Name, p2: this.p2Name, diff: this.difficulty }); 
         });
     }
 }
