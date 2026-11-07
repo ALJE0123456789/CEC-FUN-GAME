@@ -44,8 +44,8 @@ class MainMenu extends Phaser.Scene {
         this.add.text(512, 250, 'HOW TO PLAY', { fontSize: '28px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
         
         let controlsText = 
-            "Move: Arrow Keys / On-Screen Buttons\n" +
-            "Jump: Up Arrow / On-Screen Button\n" +
+            "Move: Arrow Keys / WASD / On-Screen Buttons\n" +
+            "Jump: Up Arrow / W / On-Screen Button\n" +
             "Punch (J): Fast, low damage\n" +
             "Kick (K): Slow, high damage\n" +
             "Special (F): Character's Ultimate";
@@ -70,17 +70,16 @@ class CharSelectScene extends Phaser.Scene {
     create() {
         this.p1Char = null;
         this.p2Char = null;
-        this.activePlayer = 1; // 1 or 2 (whose turn is it to pick)
+        this.activePlayer = 1; 
 
         this.cameras.main.setBackgroundColor('#2c3e50');
         this.add.text(512, 50, 'SELECT YOUR FIGHTERS', { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         
-        // Player turn indicators
         this.p1Text = this.add.text(250, 100, 'Player 1: PICKING...', { fontSize: '24px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
         this.p2Text = this.add.text(774, 100, 'Player 2: WAITING...', { fontSize: '24px', fill: '#7f8c8d' }).setOrigin(0.5);
 
         const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda'];
-        this.sprites = []; // Keep track to clear tints later
+        this.sprites = []; 
 
         chars.forEach((char, index) => {
             let x = 200 + (index * 150);
@@ -106,9 +105,8 @@ class CharSelectScene extends Phaser.Scene {
     }
 
     handleSelection(char, sprite) {
-        // Prevent P2 from picking the exact same character as P1
         if (this.activePlayer === 2 && char === this.p1Char) {
-            return; // ignore click
+            return; 
         }
 
         if (this.activePlayer === 1) {
@@ -122,21 +120,17 @@ class CharSelectScene extends Phaser.Scene {
             this.p2Text.setText(`Player 2: ${char.toUpperCase()}`);
             this.p1Text.setColor('#3498db');
             this.p2Text.setColor('#e74c3c');
-            this.activePlayer = 1; // Switch back so P1 can re-pick if they want
+            this.activePlayer = 1; 
         }
 
-        // Clear all tints to re-apply correct ones
         this.sprites.forEach(s => s.sprite.clearTint());
         
-        // Apply Blue tint to P1's choice
         let p1Sprite = this.sprites.find(s => s.name === this.p1Char);
         if (p1Sprite) p1Sprite.sprite.setTint(0x3498db);
 
-        // Apply Red tint to P2's choice
         let p2Sprite = this.sprites.find(s => s.name === this.p2Char);
         if (p2Sprite) p2Sprite.sprite.setTint(0xe74c3c);
 
-        // Show start button if both are picked
         if (this.p1Char && this.p2Char) {
             this.startBtn.setVisible(true);
         }
@@ -161,19 +155,16 @@ class DifficultyScene extends Phaser.Scene {
         
         this.add.text(512, 150, 'SELECT DIFFICULTY', { fontSize: '50px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
-        // Easy Button
         let easyBtn = this.add.text(300, 300, 'EASY', { 
             fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 30, y: 15 } 
         }).setOrigin(0.5).setInteractive();
         easyBtn.on('pointerdown', () => { this.startGame('Easy'); });
 
-        // Normal Button
         let normalBtn = this.add.text(512, 300, 'NORMAL', { 
             fontSize: '32px', fill: '#fff', backgroundColor: '#f39c12', padding: { x: 30, y: 15 } 
         }).setOrigin(0.5).setInteractive();
         normalBtn.on('pointerdown', () => { this.startGame('Normal'); });
 
-        // Hard Button
         let hardBtn = this.add.text(724, 300, 'HARD', { 
             fontSize: '32px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 30, y: 15 } 
         }).setOrigin(0.5).setInteractive();
@@ -233,11 +224,15 @@ class GameScene extends Phaser.Scene {
         this.add.text(750, 30, this.p2Name.toUpperCase(), { fontSize: '24px', fill: '#fff', fontStyle: 'bold' });
         this.enemyHealthBar = this.add.rectangle(974, 60, 300, 20, 0x2ecc71).setOrigin(1, 0.5);
         
-        // Show Difficulty
         this.add.text(512, 30, `MODE: ${this.difficulty.toUpperCase()}`, { fontSize: '20px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
 
         // Keyboard Controls
         this.cursors = this.input.keyboard.createCursorKeys();
+        // 👇 ADDED WASD KEYS HERE 👇
+        this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+        this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+        this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+        
         this.punchKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
         this.kickKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
         this.specialKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
@@ -267,7 +262,6 @@ class GameScene extends Phaser.Scene {
     update() {
         if (this.isGameOver) return;
 
-        // --- DIFFICULTY AI SETTINGS ---
         let enemySpeed = 150;
         let attackChance = 0.02;
         let specialChance = 0.01;
@@ -285,12 +279,18 @@ class GameScene extends Phaser.Scene {
             enemyDamage = 15;
         }
 
+        // 👇 ADDED WASD TO MOVEMENT LOGIC 👇
         // Player Movement
-        if (this.cursors.left.isDown || this.btnLeftPressed) this.player.setVelocityX(-250);
-        else if (this.cursors.right.isDown || this.btnRightPressed) this.player.setVelocityX(250);
-        else this.player.setVelocityX(0);
+        if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) {
+            this.player.setVelocityX(-250);
+        } else if (this.cursors.right.isDown || this.keyD.isDown || this.btnRightPressed) {
+            this.player.setVelocityX(250);
+        } else {
+            this.player.setVelocityX(0);
+        }
 
-        if ((this.cursors.up.isDown || this.btnJumpPressed) && this.player.body.touching.down) {
+        // Player Jump
+        if ((this.cursors.up.isDown || this.keyW.isDown || this.btnJumpPressed) && this.player.body.touching.down) {
             this.player.setVelocityY(-600);
             this.btnJumpPressed = false;
         }
@@ -300,7 +300,7 @@ class GameScene extends Phaser.Scene {
         if (Phaser.Input.Keyboard.JustDown(this.kickKey) && !this.playerAttackCooldown) this.doPlayerAttack('kick');
         if (Phaser.Input.Keyboard.JustDown(this.specialKey) && this.p1SpecialReady) this.useSpecial(this.p1Name, true);
 
-        // Enemy AI (Uses Difficulty variables)
+        // Enemy AI 
         if (Math.abs(this.enemy.x - this.player.x) > 100) {
             if (this.enemy.x > this.player.x) { this.enemy.setVelocityX(-enemySpeed); this.enemy.setFlipX(true); }
             else { this.enemy.setVelocityX(enemySpeed); this.enemy.setFlipX(false); }
@@ -343,7 +343,6 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    // (Keep the useSpecial and animate functions exactly as they were here...)
     useSpecial(character, isPlayer) {
         let targetHealth = isPlayer ? 'enemyHealth' : 'playerHealth';
         let targetSprite = isPlayer ? this.enemy : this.player;
@@ -436,7 +435,6 @@ const config = {
         default: 'arcade',
         arcade: { gravity: { y: 1000 }, debug: false }
     },
-    // ADDED DifficultyScene to the list!
     scene: [BootScene, MainMenu, CharSelectScene, DifficultyScene, GameScene] 
 };
 
