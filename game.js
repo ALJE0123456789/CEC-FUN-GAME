@@ -44,11 +44,13 @@ class MainMenu extends Phaser.Scene {
 
     create() {
         // Safely play BGM if it exists
-         if (this.cache.audio.exists('bgm_menu')) {
-            let existingMusic = this.sound.get('bgm_menu');
-            if (!existingMusic || !existingMusic.isPlaying) {
-                this.menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
-                this.menuMusic.play();
+             if (this.cache.audio.exists('bgm_menu')) {
+            let menuMusic = this.sound.get('bgm_menu');
+            if (!menuMusic) {
+                menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
+            }
+            if (!menuMusic.isPlaying) {
+                menuMusic.play();
             }
         }
 
@@ -134,7 +136,6 @@ class CharSelectScene extends Phaser.Scene {
 
         this.startBtn.setInteractive();
                 this.startBtn.on('pointerdown', () => {
-            if (this.menuMusic) this.menuMusic.stop(); // 👈 STOP the music HERE
             this.scene.start('DifficultyScene', { p1: this.p1Char, p2: this.p2Char });
         });
     }
@@ -218,6 +219,12 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
+        let menuMusic = this.sound.get('bgm_menu');
+        if (menuMusic && menuMusic.isPlaying) {
+            menuMusic.stop();
+        }
+
+        // 👇 START THE FIGHT MUSIC HERE 👇
         if (this.cache.audio.exists('bgm_fight')) {
             this.fightMusic = this.sound.add('bgm_fight', { loop: true, volume: 0.4 });
             this.fightMusic.play();
@@ -446,11 +453,26 @@ class GameScene extends Phaser.Scene {
         this.add.text(512, 230, funnyText, { fontSize: '24px', fill: '#2ecc71', fontStyle: 'italic', wordWrap: { width: 800 } }).setOrigin(0.5);
         this.add.text(512, 280, loserText, { fontSize: '20px', fill: '#e74c3c', wordWrap: { width: 800 } }).setOrigin(0.5);
         
+          let exitBtn = this.add.text(512, 460, 'CHANGE CHARACTERS', { fontSize: '24px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } }).setOrigin(0.5).setInteractive();
+        exitBtn.on('pointerdown', () => { 
+            // Restart menu music before going back!
+            if (this.cache.audio.exists('bgm_menu')) {
+                let menuMusic = this.sound.get('bgm_menu');
+                if (!menuMusic) {
+                    menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
+                }
+                menuMusic.play();
+            }
+            this.scene.start('CharSelectScene'); 
+        });
+
+        // 👇 ALSO UPDATE THE REPLAY BUTTON TO STOP FIGHT MUSIC 👇
         let replayBtn = this.add.text(512, 380, 'REPLAY', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
-        replayBtn.on('pointerdown', () => { this.scene.restart({ p1: this.p1Name, p2: this.p2Name, diff: this.difficulty }); });
-        
-        let exitBtn = this.add.text(512, 460, 'CHANGE CHARACTERS', { fontSize: '24px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } }).setOrigin(0.5).setInteractive();
-        exitBtn.on('pointerdown', () => { this.scene.start('CharSelectScene'); });
+        replayBtn.on('pointerdown', () => { 
+            let fightMusic = this.sound.get('bgm_fight');
+            if (fightMusic && fightMusic.isPlaying) fightMusic.stop();
+            this.scene.restart({ p1: this.p1Name, p2: this.p2Name, diff: this.difficulty }); 
+        });
     }
 }
 
