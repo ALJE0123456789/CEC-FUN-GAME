@@ -7,7 +7,8 @@ class BootScene extends Phaser.Scene {
     }
 
     preload() {
-        const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda'];
+        // ADDED aadhiljunise
+        const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
         chars.forEach(c => this.load.image(c, `assets/${c}.png`));
 
         // FALLBACK: If an image is missing, draw a purple box
@@ -60,7 +61,7 @@ class MainMenu extends Phaser.Scene {
 }
 
 // ==========================================
-// SCENE 2: CHARACTER SELECTION (Smart Swapping)
+// SCENE 2: CHARACTER SELECTION (Now with 6 characters!)
 // ==========================================
 class CharSelectScene extends Phaser.Scene {
     constructor() {
@@ -78,20 +79,27 @@ class CharSelectScene extends Phaser.Scene {
         this.p1Text = this.add.text(250, 100, 'Player 1: PICKING...', { fontSize: '24px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
         this.p2Text = this.add.text(774, 100, 'Player 2: WAITING...', { fontSize: '24px', fill: '#7f8c8d' }).setOrigin(0.5);
 
-        const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda'];
+        // ADDED aadhiljunise
+        const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
         this.sprites = []; 
 
+        // Recalculated spacing to perfectly center 6 characters
+        let startX = 512 - ((chars.length - 1) * 140) / 2; 
+
         chars.forEach((char, index) => {
-            let x = 200 + (index * 150);
+            let x = startX + (index * 140);
             let y = 300;
-            let sprite = this.add.image(x, y, char).setScale(0.4); 
+            let sprite = this.add.image(x, y, char).setScale(0.35); 
             this.sprites.push({ name: char, sprite: sprite });
             
             sprite.setInteractive();
             sprite.on('pointerdown', () => {
                 this.handleSelection(char, sprite);
             });
-            this.add.text(x, y + 120, char.toUpperCase(), { fontSize: '18px', fill: '#fff' }).setOrigin(0.5);
+            
+            // Display name below the character
+            let displayName = (char === 'aadhiljunise') ? 'AADHIL JUNISE' : char.toUpperCase();
+            this.add.text(x, y + 120, displayName, { fontSize: '16px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         });
 
         this.startBtn = this.add.text(512, 520, 'CONTINUE TO DIFFICULTY', { 
@@ -111,13 +119,15 @@ class CharSelectScene extends Phaser.Scene {
 
         if (this.activePlayer === 1) {
             this.p1Char = char;
-            this.p1Text.setText(`Player 1: ${char.toUpperCase()}`);
+            let displayName = (char === 'aadhiljunise') ? 'AADHIL JUNISE' : char.toUpperCase();
+            this.p1Text.setText(`Player 1: ${displayName}`);
             this.p2Text.setColor('#e74c3c');
             this.p2Text.setText('Player 2: PICKING...');
             this.activePlayer = 2;
         } else {
             this.p2Char = char;
-            this.p2Text.setText(`Player 2: ${char.toUpperCase()}`);
+            let displayName = (char === 'aadhiljunise') ? 'AADHIL JUNISE' : char.toUpperCase();
+            this.p2Text.setText(`Player 2: ${displayName}`);
             this.p1Text.setColor('#3498db');
             this.p2Text.setColor('#e74c3c');
             this.activePlayer = 1; 
@@ -216,19 +226,22 @@ class GameScene extends Phaser.Scene {
         this.enemy.setCollideWorldBounds(true); 
         this.physics.add.collider(this.enemy, ground);
 
+        // Format names for UI
+        let p1Display = (this.p1Name === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p1Name.toUpperCase();
+        let p2Display = (this.p2Name === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p2Name.toUpperCase();
+
         // UI Text
-        this.add.text(50, 30, this.p1Name.toUpperCase(), { fontSize: '24px', fill: '#fff', fontStyle: 'bold' });
+        this.add.text(50, 30, p1Display, { fontSize: '24px', fill: '#fff', fontStyle: 'bold' });
         this.playerHealthBar = this.add.rectangle(50, 60, 300, 20, 0x2ecc71).setOrigin(0, 0.5);
         this.p1SpecialText = this.add.text(50, 80, 'Special (F): READY', { fontSize: '16px', fill: '#f1c40f' });
 
-        this.add.text(750, 30, this.p2Name.toUpperCase(), { fontSize: '24px', fill: '#fff', fontStyle: 'bold' });
+        this.add.text(750, 30, p2Display, { fontSize: '24px', fill: '#fff', fontStyle: 'bold' });
         this.enemyHealthBar = this.add.rectangle(974, 60, 300, 20, 0x2ecc71).setOrigin(1, 0.5);
         
         this.add.text(512, 30, `MODE: ${this.difficulty.toUpperCase()}`, { fontSize: '20px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
 
         // Keyboard Controls
         this.cursors = this.input.keyboard.createCursorKeys();
-        // 👇 ADDED WASD KEYS HERE 👇
         this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
@@ -279,7 +292,6 @@ class GameScene extends Phaser.Scene {
             enemyDamage = 15;
         }
 
-        // 👇 ADDED WASD TO MOVEMENT LOGIC 👇
         // Player Movement
         if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) {
             this.player.setVelocityX(-250);
@@ -353,20 +365,54 @@ class GameScene extends Phaser.Scene {
         } else { this.p2SpecialReady = false; this.time.delayedCall(5000, () => { this.p2SpecialReady = true; }); }
 
         switch (character) {
-            case 'aadhil': this.showFloatingText("ESP32 ZAP!", attackerSprite); this[targetHealth] -= 25; this.animateLightning(attackerSprite, targetSprite); targetSprite.setTint(0x00ffff); setTimeout(() => targetSprite.clearTint(), 500); break;
-            case 'adhya': this.showFloatingText("Zzz... Healed!", attackerSprite); if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 30); else this.enemyHealth = Math.min(100, this.enemyHealth + 30); this.animateHeal(attackerSprite); break;
-            case 'shifana': this.showFloatingText("FLASH BANG!", attackerSprite); this.animateFlash(targetSprite); targetSprite.body.moves = false; setTimeout(() => { targetSprite.body.moves = true; }, 2000); break;
-            case 'abhinanda': this.showFloatingText("TRASH TALK!", attackerSprite); this[targetHealth] -= 15; this.animateSoundWaves(attackerSprite); break;
-            case 'muthalib': this.showFloatingText("INVINCIBLE!", attackerSprite); if (isPlayer) this.playerHealth += 15; this.animateGoldShield(attackerSprite); break;
+            case 'aadhil': 
+                this.showFloatingText("ESP32 ZAP!", attackerSprite); 
+                this[targetHealth] -= 25; 
+                this.animateLightning(attackerSprite, targetSprite); 
+                targetSprite.setTint(0x00ffff); 
+                setTimeout(() => targetSprite.clearTint(), 500); 
+                break;
+            case 'adhya': 
+                this.showFloatingText("Zzz... Healed!", attackerSprite); 
+                if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 30); 
+                else this.enemyHealth = Math.min(100, this.enemyHealth + 30); 
+                this.animateHeal(attackerSprite); 
+                break;
+            case 'shifana': 
+                this.showFloatingText("FLASH BANG!", attackerSprite); 
+                this.animateFlash(targetSprite); 
+                targetSprite.body.moves = false; 
+                setTimeout(() => { targetSprite.body.moves = true; }, 2000); 
+                break;
+            case 'abhinanda': 
+                this.showFloatingText("TRASH TALK!", attackerSprite); 
+                this[targetHealth] -= 15; 
+                this.animateSoundWaves(attackerSprite); 
+                break;
+            case 'muthalib': 
+                this.showFloatingText("INVINCIBLE!", attackerSprite); 
+                if (isPlayer) this.playerHealth += 15; 
+                this.animateGoldShield(attackerSprite); 
+                break;
+            case 'aadhiljunise':
+                // YOUR ULTIMATE MOVE 😈
+                this.showFloatingText("SYSTEM OVERRIDE!", attackerSprite);
+                this[targetHealth] -= 30; // Massive damage
+                if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 20); // Heal because you fixed the bugs
+                else this.enemyHealth = Math.min(100, this.enemyHealth + 20);
+                this.animateCodeRain(targetSprite); // New animation
+                break;
         }
     }
 
+    // --- ANIMATIONS ---
     animateLightning(attacker, target) {
         let lightning = this.add.graphics(); lightning.lineStyle(6, 0x00ffff, 1); lightning.beginPath(); lightning.moveTo(attacker.x, attacker.y - 50);
         let midX = (attacker.x + target.x) / 2; let midY = (attacker.y + target.y) / 2 - 100;
         lightning.lineTo(midX, midY + 50); lightning.lineTo(midX + 30, midY); lightning.lineTo(target.x, target.y - 50); lightning.strokePath();
         this.tweens.add({ targets: lightning, alpha: 0, duration: 400, onComplete: () => lightning.destroy() });
     }
+    
     animateHeal(target) {
         let healCircle = this.add.circle(target.x, target.y, 50, 0x2ecc71, 0.5);
         this.tweens.add({ targets: healCircle, scale: 2, alpha: 0, duration: 800, onComplete: () => healCircle.destroy() });
@@ -375,21 +421,58 @@ class GameScene extends Phaser.Scene {
             this.tweens.add({ targets: plus, y: target.y - 150, alpha: 0, duration: 1000, delay: i * 150, onComplete: () => plus.destroy() });
         }
     }
+    
     animateFlash(target) {
         let flash = this.add.circle(target.x, target.y, 20, 0xffffff, 1);
         this.tweens.add({ targets: flash, scale: 20, alpha: 0, duration: 600, ease: 'Expo.easeOut', onComplete: () => flash.destroy() });
         target.setTint(0xffffff); setTimeout(() => target.clearTint(), 500);
     }
+    
     animateSoundWaves(attacker) {
         for(let i=0; i<3; i++) {
             let wave = this.add.circle(attacker.x, attacker.y, 20).setStrokeStyle(4, 0xff00ff, 1);
             this.tweens.add({ targets: wave, scale: 6, alpha: 0, duration: 800, delay: i * 150, ease: 'Sine.easeOut', onComplete: () => wave.destroy() });
         }
     }
+    
     animateGoldShield(attacker) {
         attacker.setTint(0xffd700); let shield = this.add.circle(attacker.x, attacker.y, 60).setStrokeStyle(6, 0xffd700, 1);
         this.tweens.add({ targets: shield, scale: 1.3, alpha: 0.2, yoyo: true, repeat: 3, duration: 300, onComplete: () => { shield.destroy(); attacker.clearTint(); } });
     }
+
+    // NEW ANIMATION FOR AADHIL JUNISE
+    animateCodeRain(target) {
+        target.setTint(0x00ff00); // Matrix green
+        
+        // Spawn floating code symbols
+        for(let i=0; i<6; i++) {
+            let symbols = ['</>', '{}', 'AI', '0101', '&&'];
+            let codeText = symbols[Phaser.Math.Between(0, symbols.length - 1)];
+            
+            let codeSprite = this.add.text(
+                target.x + Phaser.Math.Between(-60, 60), 
+                target.y - Phaser.Math.Between(50, 150), 
+                codeText, 
+                { fontSize: '28px', fill: '#00ff00', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }
+            ).setOrigin(0.5);
+
+            this.tweens.add({
+                targets: codeSprite,
+                y: codeSprite.y + 200, // Falls down
+                alpha: 0,
+                duration: 800,
+                delay: i * 100,
+                onComplete: () => codeSprite.destroy()
+            });
+        }
+
+        // Green explosion circle
+        let blast = this.add.circle(target.x, target.y, 30, 0x00ff00, 0.6);
+        this.tweens.add({ targets: blast, scale: 4, alpha: 0, duration: 500, onComplete: () => blast.destroy() });
+        
+        setTimeout(() => target.clearTint(), 600);
+    }
+
     showFloatingText(text, sprite) {
         let txt = this.add.text(sprite.x, sprite.y - 100, text, { fontSize: '36px', fill: '#f1c40f', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5);
         this.tweens.add({ targets: txt, y: sprite.y - 200, alpha: 0, duration: 1200, onComplete: () => txt.destroy() });
@@ -397,8 +480,26 @@ class GameScene extends Phaser.Scene {
 
     endGame(winner) {
         this.isGameOver = true; this.player.setVelocityX(0); this.enemy.setVelocityX(0);
-        const winTexts = { 'aadhil': "Aadhil wins! The ESP32 short-circuited the competition.", 'muthalib': "Muthalib wins! Was there any doubt? (Spoiler: No).", 'adhya': "Adhya wins... *yawn*... wake me up when there's a real challenge.", 'shifana': "Shifana wins! Say cheese! 📸 That's going viral.", 'abhinanda': "Abhinanda wins! She literally talked the opponent to defeat." };
-        const loseTexts = { 'aadhil': "Aadhil lost because he spent the whole fight debugging the hitbox.", 'muthalib': "Muthalib lost, but his confidence remains at 100%.", 'adhya': "Adhya fell asleep and forgot to block. Zzz...", 'shifana': "Shifana lost, but she got a great shot of the punch that KO'd her.", 'abhinanda': "Abhinanda lost, but she is still talking..." };
+        
+        // ADDED CUSTOM TEXTS FOR YOU
+        const winTexts = { 
+            'aadhil': "Aadhil wins! The ESP32 short-circuited the competition.", 
+            'muthalib': "Muthalib wins! Was there any doubt? (Spoiler: No).", 
+            'adhya': "Adhya wins... *yawn*... wake me up when there's a real challenge.", 
+            'shifana': "Shifana wins! Say cheese! 📸 That's going viral.", 
+            'abhinanda': "Abhinanda wins! She literally talked the opponent to defeat.",
+            'aadhiljunise': "Aadhil Junise wins! Code compiled successfully with 0 errors. GG!"
+        };
+        
+        const loseTexts = { 
+            'aadhil': "Aadhil lost because he spent the whole fight debugging the hitbox.", 
+            'muthalib': "Muthalib lost, but his confidence remains at 100%.", 
+            'adhya': "Adhya fell asleep and forgot to block. Zzz...", 
+            'shifana': "Shifana lost, but she got a great shot of the punch that KO'd her.", 
+            'abhinanda': "Abhinanda lost, but she is still talking...",
+            'aadhiljunise': "Aadhil Junise lost. Time to check the stack trace and push a hotfix..."
+        };
+
         let mainText = winner === 'PLAYER' ? `${this.p1Name.toUpperCase()} WINS!` : `${this.p2Name.toUpperCase()} WINS!`;
         let funnyText = winner === 'PLAYER' ? winTexts[this.p1Name] : winTexts[this.p2Name];
         let loserText = winner === 'PLAYER' ? loseTexts[this.p2Name] : loseTexts[this.p1Name];
