@@ -98,25 +98,39 @@ class CharSelectScene extends Phaser.Scene {
         super('CharSelectScene');
     }
 
+    // 👇 ADDED INIT TO RECEIVE DATA BACK FROM DIFFICULTY SCENE 👇
+    init(data) {
+        this.p1Char = data.p1 || null;
+        this.p2Char = data.p2 || null;
+        this.activePlayer = this.p2Char ? 1 : (this.p1Char ? 2 : 1);
+    }
+
     create() {
-        // 👇 DELETE the old music code and replace it with this 👇
-        this.menuMusic = this.sound.get('bgm_menu');
-
-        this.p1Char = null;
-        this.p2Char = null;
-        this.activePlayer = 1; 
-        
-
-        this.p1Char = null;
-        this.p2Char = null;
-        this.activePlayer = 1; 
+        if (this.cache.audio.exists('bgm_menu')) {
+            let menuMusic = this.sound.get('bgm_menu');
+            if (menuMusic && !menuMusic.isPlaying) menuMusic.play();
+        }
 
         this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
         this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.6); 
 
+        // 👇 ADDED BACK TO MAIN MENU BUTTON 👇
+        let backBtn = this.add.text(100, 50, '⬅ MAIN MENU', { 
+            fontSize: '20px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } 
+        }).setOrigin(0.5).setInteractive();
+        
+        backBtn.on('pointerdown', () => {
+            this.scene.start('MainMenu');
+        });
+
         this.add.text(512, 50, 'SELECT YOUR FIGHTERS', { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
-        this.p1Text = this.add.text(250, 100, 'Player 1: PICKING...', { fontSize: '24px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
-        this.p2Text = this.add.text(774, 100, 'Player 2: WAITING...', { fontSize: '24px', fill: '#7f8c8d' }).setOrigin(0.5);
+        
+        // Show previously selected characters if coming back
+        let p1Display = this.p1Char ? ((this.p1Char === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p1Char.toUpperCase()) : 'PICKING...';
+        let p2Display = this.p2Char ? ((this.p2Char === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p2Char.toUpperCase()) : 'WAITING...';
+        
+        this.p1Text = this.add.text(250, 100, `Player 1: ${p1Display}`, { fontSize: '24px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
+        this.p2Text = this.add.text(774, 100, `Player 2: ${p2Display}`, { fontSize: '24px', fill: this.p2Char ? '#e74c3c' : '#7f8c8d' }).setOrigin(0.5);
 
         const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
         this.sprites = []; 
@@ -137,10 +151,19 @@ class CharSelectScene extends Phaser.Scene {
             this.add.text(x, y + 120, displayName, { fontSize: '16px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         });
 
-        this.startBtn = this.add.text(512, 520, 'CONTINUE TO DIFFICULTY', { fontSize: '32px', fill: '#2ecc71', fontStyle: 'bold', backgroundColor: '#000', padding: { x: 20, y: 10 } }).setOrigin(0.5).setVisible(false);
+        // Re-apply the tints if coming back from Difficulty screen
+        this.sprites.forEach(s => s.sprite.clearTint());
+        let p1Sprite = this.sprites.find(s => s.name === this.p1Char);
+        if (p1Sprite) p1Sprite.sprite.setTint(0x3498db);
+        let p2Sprite = this.sprites.find(s => s.name === this.p2Char);
+        if (p2Sprite) p2Sprite.sprite.setTint(0xe74c3c);
+
+        this.startBtn = this.add.text(512, 520, 'CONTINUE TO DIFFICULTY', { 
+            fontSize: '32px', fill: '#2ecc71', fontStyle: 'bold', backgroundColor: '#000', padding: { x: 20, y: 10 } 
+        }).setOrigin(0.5).setVisible(this.p1Char !== null && this.p2Char !== null);
 
         this.startBtn.setInteractive();
-                this.startBtn.on('pointerdown', () => {
+        this.startBtn.on('pointerdown', () => {
             this.scene.start('DifficultyScene', { p1: this.p1Char, p2: this.p2Char });
         });
     }
@@ -153,7 +176,7 @@ class CharSelectScene extends Phaser.Scene {
             let displayName = (char === 'aadhiljunise') ? 'AADHIL JUNISE' : char.toUpperCase();
             this.p1Text.setText(`Player 1: ${displayName}`);
             this.p2Text.setColor('#e74c3c');
-            this.p2Text.setText('Player 2: PICKING...');
+            if (!this.p2Char) this.p2Text.setText('Player 2: PICKING...');
             this.activePlayer = 2;
         } else {
             this.p2Char = char;
@@ -174,7 +197,6 @@ class CharSelectScene extends Phaser.Scene {
         if (this.p1Char && this.p2Char) this.startBtn.setVisible(true);
     }
 }
-
 // ==========================================
 // SCENE 3: DIFFICULTY SELECTION
 // ==========================================
@@ -192,6 +214,16 @@ class DifficultyScene extends Phaser.Scene {
         this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
         this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.7);
         
+        // 👇 ADDED BACK TO CHARACTER SELECT BUTTON 👇
+        let backBtn = this.add.text(150, 450, '⬅ BACK', { 
+            fontSize: '24px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 20, y: 10 } 
+        }).setOrigin(0.5).setInteractive();
+        
+        backBtn.on('pointerdown', () => {
+            // Pass the characters back so they stay selected!
+            this.scene.start('CharSelectScene', { p1: this.p1Char, p2: this.p2Char });
+        });
+
         this.add.text(512, 150, 'SELECT DIFFICULTY', { fontSize: '50px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
         let easyBtn = this.add.text(300, 300, 'EASY', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
