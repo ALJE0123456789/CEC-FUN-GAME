@@ -168,9 +168,12 @@ class CharSelectScene extends Phaser.Scene {
 
     init(data) {
         this.gameMode = data.mode || 'ai'; // 'ai' or 'online'
-        this.p1Char = data.p1 || null;
-        this.p2Char = data.p2 || null;
-        this.activePlayer = this.p2Char ? 1 : (this.p1Char ? 2 : 1);
+        this.p1Char = null;
+        this.p2Char = null;
+        this.matchStarted = false;
+        
+        // AI Mode logic
+        this.activePlayer = 1;
     }
 
     create() {
@@ -189,13 +192,11 @@ class CharSelectScene extends Phaser.Scene {
             this.scene.start('MainMenu');
         });
 
-        this.add.text(512, 50, `SELECT FIGHTERS (${this.gameMode.toUpperCase()})`, { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        let modeText = this.gameMode === 'online' ? 'ONLINE PVP' : 'VS COMPUTER';
+        this.add.text(512, 50, `SELECT FIGHTERS (${modeText})`, { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         
-        let p1Display = this.p1Char ? ((this.p1Char === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p1Char.toUpperCase()) : 'PICKING...';
-        let p2Display = this.p2Char ? ((this.p2Char === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p2Char.toUpperCase()) : 'WAITING...';
-        
-        this.p1Text = this.add.text(250, 100, `P1: ${p1Display}`, { fontSize: '24px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
-        this.p2Text = this.add.text(774, 100, `P2: ${p2Display}`, { fontSize: '24px', fill: this.p2Char ? '#e74c3c' : '#7f8c8d' }).setOrigin(0.5);
+        this.p1Text = this.add.text(250, 100, 'P1: PICKING...', { fontSize: '24px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
+        this.p2Text = this.add.text(774, 100, 'P2: WAITING...', { fontSize: '24px', fill: '#7f8c8d' }).setOrigin(0.5);
 
         const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
         this.sprites = []; 
@@ -207,14 +208,7 @@ class CharSelectScene extends Phaser.Scene {
             let sprite = this.add.image(x, y, char).setScale(0.35); 
             this.sprites.push({ name: char, sprite: sprite });
             
-            // ONLY ALLOW HOST TO PICK P1, GUEST TO PICK P2
-            if (this.gameMode === 'online') {
-                if (isHost && this.activePlayer === 1) sprite.setInteractive();
-                if (!isHost && this.activePlayer === 2) sprite.setInteractive();
-            } else {
-                sprite.setInteractive();
-            }
-
+            sprite.setInteractive();
             sprite.on('pointerdown', () => {
                 this.handleSelection(char, sprite);
             });
@@ -223,72 +217,96 @@ class CharSelectScene extends Phaser.Scene {
             this.add.text(x, y + 120, displayName, { fontSize: '16px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         });
 
-        this.sprites.forEach(s => s.sprite.clearTint());
-        let p1Sprite = this.sprites.find(s => s.name === this.p1Char);
-        if (p1Sprite) p1Sprite.sprite.setTint(0x3498db);
-        let p2Sprite = this.sprites.find(s => s.name === this.p2Char);
-        if (p2Sprite) p2Sprite.sprite.setTint(0xe74c3c);
+        this.startBtn = this.add.text(512, 520, 'CONTINUE', { fontSize: '32px', fill: '#2ecc71', fontStyle: 'bold', backgroundColor: '#000', padding: { x: 20, y: 10 } }).setOrigin(0.5).setVisible(false);
 
-        this.startBtn = this.add.text(512, 520, 'CONTINUE', { fontSize: '32px', fill: '#2ecc71', fontStyle: 'bold', backgroundColor: '#000', padding: { x: 20, y: 10 } }).setOrigin(0.5).setVisible(this.p1Char !== null && this.p2Char !== null && this.gameMode !== 'online');
-
+        // AI MODE START BUTTON
         this.startBtn.setInteractive();
         this.startBtn.on('pointerdown', () => {
             this.scene.start('DifficultyScene', { p1: this.p1Char, p2: this.p2Char });
         });
-        
-        // If online, listen for network sync of character picks
+
+        // NETWORK LISTENER
         if (this.gameMode === 'online' && conn) {
             conn.on('data', (data) => {
                 if (data.type === 'pick') {
-                    this.p2Char = data.char;
-                    this.p2Text.setText(`P2: ${data.char.toUpperCase()}`);
-                    let p2Sprite = this.sprites.find(s => s.name === this.p2Char);
-                    if (p2Sprite) p2Sprite.sprite.setTint(0xe74c3c);
-                    
-                    // If host, both are picked, start match automatically
-                    if (isHost && this.p1Char) {
-                        conn.send({ type: 'start_match', p1: this.p1Char, p2: this.p2Char });
-                        this.scene.start('GameScene', { p1: this.p1Char, p2: this.p2Char, mode: 'online' });
+                    if (data.role === 'p1') {
+                        this.p1Char = data.char;
+                        this.updateUI();
+                    } else if (data.role === 'p2') {
+                        this.p2Char = data.char;
+                        this.updateUI();
                     }
+                    this.checkStartMatch();
                 }
-                if (data.type === 'start_match') {
-                    // Guest receives start signal
-                    if (!isHost) {
-                        this.scene.start('GameScene', { p1: data.p1, p2: data.p2, mode: 'online' });
-                    }
+                if (data.type === 'start_match' && !isHost) {
+                    this.scene.start('GameScene', { p1: data.p1, p2: data.p2, mode: 'online' });
                 }
             });
         }
     }
 
-    handleSelection(char) {
-        if (this.activePlayer === 2 && char === this.p1Char) return; 
-
-        if (this.activePlayer === 1) {
-            this.p1Char = char;
-            this.p1Text.setText(`P1: ${char.toUpperCase()}`);
-            this.activePlayer = 2;
-        } else {
-            this.p2Char = char;
-            this.p2Text.setText(`P2: ${char.toUpperCase()}`);
-            this.activePlayer = 1; 
-            
-            // Send pick to host
-            if (this.gameMode === 'online' && !isHost && conn) {
-                conn.send({ type: 'pick', char: char });
+    handleSelection(char, sprite) {
+        if (this.gameMode === 'online') {
+            if (isHost) {
+                // HOST PICKS PLAYER 1
+                this.p1Char = char;
+                this.updateUI();
+                if (conn) conn.send({ type: 'pick', role: 'p1', char: char });
+            } else {
+                // GUEST PICKS PLAYER 2 (Cannot pick P1's character)
+                if (char === this.p1Char) return; 
+                this.p2Char = char;
+                this.updateUI();
+                if (conn) conn.send({ type: 'pick', role: 'p2', char: char });
             }
+            this.checkStartMatch();
+        } else {
+            // AI MODE LOGIC (Alternating picks)
+            if (this.activePlayer === 2 && char === this.p1Char) return; 
+
+            if (this.activePlayer === 1) {
+                this.p1Char = char;
+                this.activePlayer = 2;
+            } else {
+                this.p2Char = char;
+                this.activePlayer = 1; 
+            }
+            this.updateUI();
+            if (this.p1Char && this.p2Char) this.startBtn.setVisible(true);
+        }
+    }
+
+    updateUI() {
+        this.sprites.forEach(s => s.sprite.clearTint());
+        
+        if (this.p1Char) {
+            let p1Sprite = this.sprites.find(s => s.name === this.p1Char);
+            if (p1Sprite) p1Sprite.sprite.setTint(0x3498db);
+            let dName = (this.p1Char === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p1Char.toUpperCase();
+            this.p1Text.setText(`P1: ${dName}`);
+            this.p1Text.setColor('#3498db');
         }
 
-        this.sprites.forEach(s => s.sprite.clearTint());
-        let p1Sprite = this.sprites.find(s => s.name === this.p1Char);
-        if (p1Sprite) p1Sprite.sprite.setTint(0x3498db);
-        let p2Sprite = this.sprites.find(s => s.name === this.p2Char);
-        if (p2Sprite) p2Sprite.sprite.setTint(0xe74c3c);
+        if (this.p2Char) {
+            let p2Sprite = this.sprites.find(s => s.name === this.p2Char);
+            if (p2Sprite) p2Sprite.sprite.setTint(0xe74c3c);
+            let dName = (this.p2Char === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p2Char.toUpperCase();
+            this.p2Text.setText(`P2: ${dName}`);
+            this.p2Text.setColor('#e74c3c');
+        }
+    }
 
-        if (this.p1Char && this.p2Char && this.gameMode !== 'online') this.startBtn.setVisible(true);
+    checkStartMatch() {
+        // If both are picked in online mode, START AUTOMATICALLY
+        if (this.gameMode === 'online' && this.p1Char && this.p2Char && !this.matchStarted) {
+            if (isHost) {
+                this.matchStarted = true;
+                if (conn) conn.send({ type: 'start_match', p1: this.p1Char, p2: this.p2Char });
+                this.scene.start('GameScene', { p1: this.p1Char, p2: this.p2Char, mode: 'online' });
+            }
+        }
     }
 }
-
 // ==========================================
 // SCENE 4: DIFFICULTY SELECTION
 // ==========================================
@@ -334,7 +352,7 @@ class GameScene extends Phaser.Scene {
         this.p1Name = data.p1 || 'aadhil'; 
         this.p2Name = data.p2 || 'muthalib';
         this.difficulty = data.diff || 'Normal';
-        this.gameMode = data.mode || 'ai'; // 'ai' or 'online'
+        this.gameMode = data.mode || 'ai'; 
     }
 
     create() {
@@ -381,40 +399,39 @@ class GameScene extends Phaser.Scene {
         this.kickKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
         this.specialKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
 
-        // TOUCH CONTROLS ONLY SHOWN FOR AI MODE OR THE ACTIVE PLAYER
-        if (this.gameMode === 'ai' || (this.gameMode === 'online' && isHost)) {
-            this.createTouchButton(100, 480, '◀', 0x95a5a6, () => { this.btnLeftPressed = true; }, () => { this.btnLeftPressed = false; });
-            this.createTouchButton(220, 480, '▶', 0x95a5a6, () => { this.btnRightPressed = true; }, () => { this.btnRightPressed = false; });
-            this.createTouchButton(160, 380, '▲', 0x95a5a6, () => { this.btnJumpPressed = true; }, () => { this.btnJumpPressed = false; });
-            this.createTouchButton(850, 480, 'PUNCH', 0xe74c3c, () => this.doPlayerAttack('punch'), () => {});
-            this.createTouchButton(700, 480, 'KICK', 0x3498db, () => this.doPlayerAttack('kick'), () => {});
-            this.createTouchButton(550, 480, 'SPECIAL', 0xf1c40f, () => { if(this.p1SpecialReady) this.useSpecial(this.p1Name, true); }, () => {});
-        }
+        // TOUCH CONTROLS
+        this.createTouchButton(100, 480, '◀', 0x95a5a6, () => { this.btnLeftPressed = true; }, () => { this.btnLeftPressed = false; });
+        this.createTouchButton(220, 480, '▶', 0x95a5a6, () => { this.btnRightPressed = true; }, () => { this.btnRightPressed = false; });
+        this.createTouchButton(160, 380, '▲', 0x95a5a6, () => { this.btnJumpPressed = true; }, () => { this.btnJumpPressed = false; });
+        this.createTouchButton(850, 480, 'PUNCH', 0xe74c3c, () => this.doLocalAttack('punch'), () => {});
+        this.createTouchButton(700, 480, 'KICK', 0x3498db, () => this.doLocalAttack('kick'), () => {});
+        this.createTouchButton(550, 480, 'SPECIAL', 0xf1c40f, () => this.doLocalSpecial(), () => {});
 
-        // NETWORK LISTENER
+        // NETWORK SYNC LISTENER
         if (this.gameMode === 'online' && conn) {
             conn.on('data', (data) => {
                 if (data.type === 'sync') {
-                    // If Host receives P2 data, move the enemy
                     if (isHost) {
+                        // Host receives Guest's movement (Guest controls Enemy)
                         this.enemy.x = data.x;
                         this.enemy.y = data.y;
                         this.enemy.setFlipX(data.flipX);
-                        if (data.action === 'punch') this.doEnemyAttack(10, false);
-                        if (data.action === 'kick') this.doEnemyAttack(15, false);
+                        this.playerHealth = data.p1Health;
+                        this.enemyHealth = data.p2Health;
+                        if (data.action === 'punch') this.executeAttack(this.enemy, this.player, 'punch');
+                        if (data.action === 'kick') this.executeAttack(this.enemy, this.player, 'kick');
                         if (data.action === 'special') this.useSpecial(this.p2Name, false);
-                    } 
-                    // If Guest receives P1 data, move the player
-                    else {
+                    } else {
+                        // Guest receives Host's movement (Host controls Player)
                         this.player.x = data.x;
                         this.player.y = data.y;
                         this.player.setFlipX(data.flipX);
-                        if (data.action === 'punch') this.doEnemyAttack(10, true); // true means it hits the guest's player
-                        if (data.action === 'kick') this.doEnemyAttack(15, true);
+                        this.playerHealth = data.p1Health;
+                        this.enemyHealth = data.p2Health;
+                        if (data.action === 'punch') this.executeAttack(this.player, this.enemy, 'punch');
+                        if (data.action === 'kick') this.executeAttack(this.player, this.enemy, 'kick');
                         if (data.action === 'special') this.useSpecial(this.p1Name, true);
                     }
-                    this.enemyHealth = data.enemyHealth; // Sync health
-                    this.playerHealth = data.playerHealth;
                 }
             });
         }
@@ -430,11 +447,9 @@ class GameScene extends Phaser.Scene {
     update() {
         if (this.isGameOver) return;
 
-        let enemySpeed = 150; let attackChance = 0.02; let specialChance = 0.01; let enemyDamage = 10;
-        if (this.difficulty === 'Easy') { enemySpeed = 80; attackChance = 0.008; specialChance = 0.003; enemyDamage = 5; } 
-        else if (this.difficulty === 'Hard') { enemySpeed = 250; attackChance = 0.05; specialChance = 0.03; enemyDamage = 15; }
+        let localAction = "";
 
-        // CONTROLS (ONLY FOR THE LOCAL PLAYER)
+        // HOST CONTROLS PLAYER 1
         if (this.gameMode === 'ai' || (this.gameMode === 'online' && isHost)) {
             if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) { this.player.setVelocityX(-250); } 
             else if (this.cursors.right.isDown || this.keyD.isDown || this.btnRightPressed) { this.player.setVelocityX(250); } 
@@ -444,36 +459,62 @@ class GameScene extends Phaser.Scene {
                 this.player.setVelocityY(-600); this.btnJumpPressed = false;
             }
 
-            if (Phaser.Input.Keyboard.JustDown(this.punchKey) && !this.playerAttackCooldown) this.doPlayerAttack('punch');
-            if (Phaser.Input.Keyboard.JustDown(this.kickKey) && !this.playerAttackCooldown) this.doPlayerAttack('kick');
-            if (Phaser.Input.Keyboard.JustDown(this.specialKey) && this.p1SpecialReady) this.useSpecial(this.p1Name, true);
+            if (Phaser.Input.Keyboard.JustDown(this.punchKey)) localAction = "punch";
+            if (Phaser.Input.Keyboard.JustDown(this.kickKey)) localAction = "kick";
+            if (Phaser.Input.Keyboard.JustDown(this.specialKey)) localAction = "special";
+
+            if (localAction === "punch") this.doLocalAttack('punch');
+            if (localAction === "kick") this.doLocalAttack('kick');
+            if (localAction === "special") this.doLocalSpecial();
+        } 
+        // GUEST CONTROLS PLAYER 2 (Enemy sprite)
+        else if (this.gameMode === 'online' && !isHost) {
+            if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) { this.enemy.setVelocityX(-250); } 
+            else if (this.cursors.right.isDown || this.keyD.isDown || this.btnRightPressed) { this.enemy.setVelocityX(250); } 
+            else { this.enemy.setVelocityX(0); }
+
+            if ((this.cursors.up.isDown || this.keyW.isDown || this.btnJumpPressed) && this.enemy.body.touching.down) {
+                this.enemy.setVelocityY(-600); this.btnJumpPressed = false;
+            }
+
+            if (Phaser.Input.Keyboard.JustDown(this.punchKey)) localAction = "punch";
+            if (Phaser.Input.Keyboard.JustDown(this.kickKey)) localAction = "kick";
+            if (Phaser.Input.Keyboard.JustDown(this.specialKey)) localAction = "special";
+
+            if (localAction === "punch") this.doLocalAttack('punch');
+            if (localAction === "kick") this.doLocalAttack('kick');
+            if (localAction === "special") this.doLocalSpecial();
         }
 
-        // SEND NETWORK DATA (if online)
-        if (this.gameMode === 'online' && conn) {
-            let localAction = "";
-            if (this.gameMode === 'online' && isHost && Phaser.Input.Keyboard.JustDown(this.punchKey)) localAction = "punch";
-            // We would need a full input system for guest, but for simplicity, host controls P1, guest controls P2.
-            
-            conn.send({
-                type: 'sync',
-                x: (isHost ? this.player.x : this.enemy.x),
-                y: (isHost ? this.player.y : this.enemy.y),
-                flipX: (isHost ? this.player.flipX : this.enemy.flipX),
-                action: localAction,
-                playerHealth: this.playerHealth,
-                enemyHealth: this.enemyHealth
-            });
-        } else {
-            // ENEMY AI (ONLY IN AI MODE)
+        // AI LOGIC (Only in AI mode)
+        if (this.gameMode === 'ai') {
+            let enemySpeed = 150; let attackChance = 0.02; let specialChance = 0.01;
+            if (this.difficulty === 'Easy') { enemySpeed = 80; attackChance = 0.008; specialChance = 0.003; } 
+            else if (this.difficulty === 'Hard') { enemySpeed = 250; attackChance = 0.05; specialChance = 0.03; }
+
             if (Math.abs(this.enemy.x - this.player.x) > 100) {
                 if (this.enemy.x > this.player.x) { this.enemy.setVelocityX(-enemySpeed); this.enemy.setFlipX(true); }
                 else { this.enemy.setVelocityX(enemySpeed); this.enemy.setFlipX(false); }
             } else {
                 this.enemy.setVelocityX(0);
-                if (Math.random() < attackChance) this.doEnemyAttack(enemyDamage, false);
+                if (Math.random() < attackChance) this.executeAttack(this.enemy, this.player, 'punch');
                 if (Math.random() < specialChance && this.p2SpecialReady) this.useSpecial(this.p2Name, false);
             }
+        }
+
+        // SEND NETWORK DATA
+        if (this.gameMode === 'online' && conn && localAction !== "") {
+            conn.send({
+                type: 'sync',
+                x: isHost ? this.player.x : this.enemy.x,
+                y: isHost ? this.player.y : this.enemy.y,
+                flipX: isHost ? this.player.flipX : this.enemy.flipX,
+                p1Health: this.playerHealth,
+                p2Health: this.enemyHealth,
+                action: localAction
+            });
+            // Reset action after sending so it doesn't spam
+            localAction = ""; 
         }
 
         this.playerHealthBar.width = (Math.max(0, this.playerHealth) / 100) * 300;
@@ -483,35 +524,39 @@ class GameScene extends Phaser.Scene {
         if (this.playerHealth <= 0 && !this.isGameOver) this.endGame('ENEMY');
     }
 
-    doPlayerAttack(type) {
+    doLocalAttack(type) {
+        if (this.playerAttackCooldown) return;
         this.playerAttackCooldown = true;
         setTimeout(() => this.playerAttackCooldown = false, type === 'kick' ? 600 : 300);
+
         let sfxKey = type === 'kick' ? 'sfx_kick' : 'sfx_punch';
         if (!this.sound.mute && this.cache.audio.exists(sfxKey)) this.sound.play(sfxKey, { volume: 0.6 });
 
-        let distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.enemy.x, this.enemy.y);
-        if (distance < (type === 'kick' ? 220 : 180)) {
-            this.enemyHealth -= (type === 'kick' ? 15 : 10);
-            this.player.x += (this.player.x < this.enemy.x ? 30 : -30);
-            if (type === 'kick') { this.enemy.setTint(0xffaa00); this.cameras.main.shake(100, 0.005); }
-            else { this.enemy.setTint(0xff0000); }
-            setTimeout(() => this.enemy.clearTint(), 150);
+        if (isHost || this.gameMode === 'ai') {
+            this.executeAttack(this.player, this.enemy, type);
+        } else {
+            this.executeAttack(this.enemy, this.player, type);
         }
     }
 
-    doEnemyAttack(damage, hitPlayer) {
-        let distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.enemy.x, this.enemy.y);
-        if (distance < 200) {
-            if (!this.sound.mute && this.cache.audio.exists('sfx_punch')) this.sound.play('sfx_punch', { volume: 0.4 }); 
-            if (hitPlayer) {
-                this.playerHealth -= damage;
-                this.player.setTint(0xff0000);
-                setTimeout(() => this.player.clearTint(), 150);
-            } else {
-                this.enemyHealth -= damage;
-                this.enemy.setTint(0xff0000);
-                setTimeout(() => this.enemy.clearTint(), 150);
-            }
+    executeAttack(attacker, defender, type) {
+        let distance = Phaser.Math.Distance.Between(attacker.x, attacker.y, defender.x, defender.y);
+        if (distance < (type === 'kick' ? 220 : 180)) {
+            if (defender === this.enemy) this.enemyHealth -= (type === 'kick' ? 15 : 10);
+            if (defender === this.player) this.playerHealth -= (type === 'kick' ? 15 : 10);
+            
+            attacker.x += (attacker.x < defender.x ? 30 : -30);
+            if (type === 'kick') { defender.setTint(0xffaa00); this.cameras.main.shake(100, 0.005); }
+            else { defender.setTint(0xff0000); }
+            setTimeout(() => defender.clearTint(), 150);
+        }
+    }
+
+    doLocalSpecial() {
+        if (isHost || this.gameMode === 'ai') {
+            if (this.p1SpecialReady) this.useSpecial(this.p1Name, true);
+        } else {
+            if (this.p2SpecialReady) this.useSpecial(this.p2Name, false);
         }
     }
 
@@ -538,7 +583,7 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    // (Keep all your animate functions exactly the same, they don't need to change)
+    // (Keep all your animate functions exactly the same: animateLightning, animateHeal, animateFlash, animateSoundWaves, animateGoldShield, animateCodeRain, showFloatingText)
     animateLightning(attacker, target) { let lightning = this.add.graphics(); lightning.lineStyle(6, 0x00ffff, 1); lightning.beginPath(); lightning.moveTo(attacker.x, attacker.y - 50); let midX = (attacker.x + target.x) / 2; let midY = (attacker.y + target.y) / 2 - 100; lightning.lineTo(midX, midY + 50); lightning.lineTo(midX + 30, midY); lightning.lineTo(target.x, target.y - 50); lightning.strokePath(); this.tweens.add({ targets: lightning, alpha: 0, duration: 400, onComplete: () => lightning.destroy() }); }
     animateHeal(target) { let healCircle = this.add.circle(target.x, target.y, 50, 0x2ecc71, 0.5); this.tweens.add({ targets: healCircle, scale: 2, alpha: 0, duration: 800, onComplete: () => healCircle.destroy() }); for(let i=0; i<3; i++) { let plus = this.add.text(target.x + Phaser.Math.Between(-40, 40), target.y, "+", { fontSize: '40px', fill: '#2ecc71', fontStyle: 'bold' }).setOrigin(0.5); this.tweens.add({ targets: plus, y: target.y - 150, alpha: 0, duration: 1000, delay: i * 150, onComplete: () => plus.destroy() }); } }
     animateFlash(target) { let flash = this.add.circle(target.x, target.y, 20, 0xffffff, 1); this.tweens.add({ targets: flash, scale: 20, alpha: 0, duration: 600, ease: 'Expo.easeOut', onComplete: () => flash.destroy() }); target.setTint(0xffffff); setTimeout(() => target.clearTint(), 500); }
@@ -588,7 +633,6 @@ class GameScene extends Phaser.Scene {
         });
     }
 }
-
 // ==========================================
 // INITIALIZE THE GAME
 // ==========================================
