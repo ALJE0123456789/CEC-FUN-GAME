@@ -423,10 +423,13 @@ const config = {
     width: 1024,
     height: 576,
     parent: 'game-container',
-    // THIS IS THE MAGIC LINE THAT MAKES IT RESPONSIVE ON MOBILE
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    
+    input: {
+        activePointers: 4 // Allows up to 4 fingers on the screen at once!
     },
     physics: {
         default: 'arcade',
@@ -434,5 +437,4 @@ const config = {
     },
     scene: [BootScene, MainMenu, CharSelectScene, GameScene] 
 };
-
 const game = new Phaser.Game(config);
