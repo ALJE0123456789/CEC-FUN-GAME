@@ -1,26 +1,30 @@
 // ==========================================
-// SCENE 0: BOOT (Loads images)
+// SCENE 0: BOOT
 // ==========================================
 class BootScene extends Phaser.Scene {
     constructor() {
         super('BootScene'); 
     }
 
-     preload() {
-        // background image
+    preload() {
         this.load.image('background', 'assets/background.png');
-        
         const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
         chars.forEach(c => this.load.image(c, `assets/${c}.png`));
 
-        // FALLBACK: If an image is missing, draw a purple box
+        // Load Audio
+        this.load.audio('bgm_menu', 'assets/bgm_menu.mp3'); 
+        this.load.audio('bgm_fight', 'assets/bgm_fight.mp3'); 
+        this.load.audio('sfx_punch', 'assets/sfx_punch.mp3');
+        this.load.audio('sfx_kick', 'assets/sfx_kick.mp3');
+        this.load.audio('sfx_special', 'assets/sfx_special.mp3');
+        this.load.audio('sfx_win', 'assets/sfx_win.mp3');
+        this.load.audio('sfx_lose', 'assets/sfx_lose.mp3');
+
+        // Image Fallback
         this.load.on('loaderror', (file) => {
-            console.log("Missing image: " + file.key);
             const g = this.make.graphics({x:0, y:0, add:false});
-            g.fillStyle(0x4f46e5, 1); // Purple
-            g.fillRect(0, 0, 100, 200);
-            g.lineStyle(4, 0xffffff, 1);
-            g.strokeRect(0, 0, 100, 200);
+            g.fillStyle(0x4f46e5, 1); g.fillRect(0, 0, 100, 200);
+            g.lineStyle(4, 0xffffff, 1); g.strokeRect(0, 0, 100, 200);
             g.generateTexture(file.key, 100, 200);
         });
     }
@@ -39,58 +43,71 @@ class MainMenu extends Phaser.Scene {
     }
 
     create() {
-        
-          // 👇 ADD THESE TWO LINES HERE 👇
+        // Safely play BGM if it exists
+        if (this.cache.audio.exists('bgm_menu')) {
+            this.menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
+            this.menuMusic.play();
+        }
+
         this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
         this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.7); 
         
-       this.add.text(512, 100, 'FIGHT KARO', { fontSize: '80px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.text(512, 100, 'FIGHT KARO', { fontSize: '80px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
         this.add.text(512, 170, 'COLLEGE EDITION', { fontSize: '32px', fill: '#ecf0f1' }).setOrigin(0.5);
 
         this.add.text(512, 250, 'HOW TO PLAY', { fontSize: '28px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
-        
-        let controlsText = 
-            "Move: Arrow Keys / WASD / On-Screen Buttons\n" +
-            "Jump: Up Arrow / W / On-Screen Button\n" +
-            "Punch (J): Fast, low damage\n" +
-            "Kick (K): Slow, high damage\n" +
-            "Special (F): Character's Ultimate";
-            
+        let controlsText = "Move: Arrow Keys / WASD / On-Screen Buttons\nJump: Up Arrow / W / On-Screen Button\nPunch (J): Fast, low damage\nKick (K): Slow, high damage\nSpecial (F): Character's Ultimate";
         this.add.text(512, 330, controlsText, { fontSize: '20px', fill: '#bdc3c7', align: 'center', lineSpacing: 8 }).setOrigin(0.5);
 
+        // MUTE BUTTON
+        let isMuted = this.sound.mute;
+        let muteBtn = this.add.text(900, 50, isMuted ? '🔇 Muted' : '🔊 Sound ON', { 
+            fontSize: '20px', fill: '#fff', backgroundColor: '#333', padding: { x: 10, y: 10 } 
+        }).setOrigin(0.5).setInteractive();
+
+        muteBtn.on('pointerdown', () => {
+            this.sound.mute = !this.sound.mute;
+            muteBtn.setText(this.sound.mute ? '🔇 Muted' : '🔊 Sound ON');
+        });
+
         let playBtn = this.add.text(512, 470, 'PLAY', { fontSize: '40px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 40, y: 20 } }).setOrigin(0.5).setInteractive();
-        playBtn.on('pointerdown', () => { this.scene.start('CharSelectScene'); });
+        
+        playBtn.on('pointerdown', () => { 
+            if (this.menuMusic) this.menuMusic.stop();
+            this.scene.start('CharSelectScene'); 
+        });
         playBtn.on('pointerover', () => playBtn.setStyle({ backgroundColor: '#27ae60' }));
         playBtn.on('pointerout', () => playBtn.setStyle({ backgroundColor: '#2ecc71' }));
     }
 }
 
 // ==========================================
-// SCENE 2: CHARACTER SELECTION (Now with 6 characters!)
+// SCENE 2: CHARACTER SELECTION
 // ==========================================
 class CharSelectScene extends Phaser.Scene {
     constructor() {
         super('CharSelectScene');
     }
+
     create() {
+        if (this.cache.audio.exists('bgm_menu')) {
+            this.menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.3 });
+            this.menuMusic.play();
+        }
+
         this.p1Char = null;
         this.p2Char = null;
         this.activePlayer = 1; 
 
-        // 👇 ADD THESE TWO LINES HERE 👇
         this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
         this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.6); 
 
-        // this.cameras.main.setBackgroundColor('#2c3e50'); // You can remove this
-        
         this.add.text(512, 50, 'SELECT YOUR FIGHTERS', { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
-        
         this.p1Text = this.add.text(250, 100, 'Player 1: PICKING...', { fontSize: '24px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
         this.p2Text = this.add.text(774, 100, 'Player 2: WAITING...', { fontSize: '24px', fill: '#7f8c8d' }).setOrigin(0.5);
 
         const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
         this.sprites = []; 
-
         let startX = 512 - ((chars.length - 1) * 140) / 2; 
 
         chars.forEach((char, index) => {
@@ -108,22 +125,17 @@ class CharSelectScene extends Phaser.Scene {
             this.add.text(x, y + 120, displayName, { fontSize: '16px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         });
 
-        this.startBtn = this.add.text(512, 520, 'CONTINUE TO DIFFICULTY', { 
-            fontSize: '32px', fill: '#2ecc71', fontStyle: 'bold', backgroundColor: '#000', padding: { x: 20, y: 10 }
-        }).setOrigin(0.5).setVisible(false);
+        this.startBtn = this.add.text(512, 520, 'CONTINUE TO DIFFICULTY', { fontSize: '32px', fill: '#2ecc71', fontStyle: 'bold', backgroundColor: '#000', padding: { x: 20, y: 10 } }).setOrigin(0.5).setVisible(false);
 
         this.startBtn.setInteractive();
         this.startBtn.on('pointerdown', () => {
+            if (this.menuMusic) this.menuMusic.stop();
             this.scene.start('DifficultyScene', { p1: this.p1Char, p2: this.p2Char });
         });
     }
 
-    // Keep the handleSelection function exactly as it is...
-
     handleSelection(char, sprite) {
-        if (this.activePlayer === 2 && char === this.p1Char) {
-            return; 
-        }
+        if (this.activePlayer === 2 && char === this.p1Char) return; 
 
         if (this.activePlayer === 1) {
             this.p1Char = char;
@@ -145,13 +157,10 @@ class CharSelectScene extends Phaser.Scene {
         
         let p1Sprite = this.sprites.find(s => s.name === this.p1Char);
         if (p1Sprite) p1Sprite.sprite.setTint(0x3498db);
-
         let p2Sprite = this.sprites.find(s => s.name === this.p2Char);
         if (p2Sprite) p2Sprite.sprite.setTint(0xe74c3c);
 
-        if (this.p1Char && this.p2Char) {
-            this.startBtn.setVisible(true);
-        }
+        if (this.p1Char && this.p2Char) this.startBtn.setVisible(true);
     }
 }
 
@@ -169,23 +178,18 @@ class DifficultyScene extends Phaser.Scene {
     }
 
     create() {
-        this.cameras.main.setBackgroundColor('#1a1a1a');
+        this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
+        this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.7);
         
         this.add.text(512, 150, 'SELECT DIFFICULTY', { fontSize: '50px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
-        let easyBtn = this.add.text(300, 300, 'EASY', { 
-            fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 30, y: 15 } 
-        }).setOrigin(0.5).setInteractive();
+        let easyBtn = this.add.text(300, 300, 'EASY', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
         easyBtn.on('pointerdown', () => { this.startGame('Easy'); });
 
-        let normalBtn = this.add.text(512, 300, 'NORMAL', { 
-            fontSize: '32px', fill: '#fff', backgroundColor: '#f39c12', padding: { x: 30, y: 15 } 
-        }).setOrigin(0.5).setInteractive();
+        let normalBtn = this.add.text(512, 300, 'NORMAL', { fontSize: '32px', fill: '#fff', backgroundColor: '#f39c12', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
         normalBtn.on('pointerdown', () => { this.startGame('Normal'); });
 
-        let hardBtn = this.add.text(724, 300, 'HARD', { 
-            fontSize: '32px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 30, y: 15 } 
-        }).setOrigin(0.5).setInteractive();
+        let hardBtn = this.add.text(724, 300, 'HARD', { fontSize: '32px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
         hardBtn.on('pointerdown', () => { this.startGame('Hard'); });
     }
 
@@ -209,46 +213,29 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
-        this.playerHealth = 100; 
-        this.enemyHealth = 100; 
-        this.isGameOver = false;
-        this.p1SpecialReady = true;
-        this.p2SpecialReady = true;
-        this.playerAttackCooldown = false;
-        
-        this.btnLeftPressed = false;
-        this.btnRightPressed = false;
-        this.btnJumpPressed = false;
+        if (this.cache.audio.exists('bgm_fight')) {
+            this.fightMusic = this.sound.add('bgm_fight', { loop: true, volume: 0.4 });
+            this.fightMusic.play();
+        }
 
-        this.cameras.main.setBackgroundColor('#2c3e50'); 
-        
-        // 👇 ADD THE BACKGROUND IMAGE HERE 👇
-        // The first two numbers (512, 288) center it, and setDisplaySize makes it fit the screen.
+        this.playerHealth = 100; this.enemyHealth = 100; this.isGameOver = false;
+        this.p1SpecialReady = true; this.p2SpecialReady = true; this.playerAttackCooldown = false;
+        this.btnLeftPressed = false; this.btnRightPressed = false; this.btnJumpPressed = false;
+
         this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
-        
-        // 👇 ADD A DARK OVERLAY SO THE UI IS READABLE 👇
-        // This draws a black box over the background at 40% opacity.
-        this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.5);
+        this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.4);
 
         this.physics.world.setBounds(0, 0, 1024, 576);
-
         const ground = this.add.rectangle(512, 550, 1024, 50, 0x7f8c8d);
-       
         this.physics.add.existing(ground, true); 
 
-        this.player = this.physics.add.sprite(250, 400, this.p1Name).setScale(0.4);
-        this.player.setCollideWorldBounds(true); 
-        this.physics.add.collider(this.player, ground);
+        this.player = this.physics.add.sprite(250, 400, this.p1Name).setScale(0.4).setCollideWorldBounds(true);
+        this.enemy = this.physics.add.sprite(774, 400, this.p2Name).setScale(0.4).setFlipX(true).setCollideWorldBounds(true);
+        this.physics.add.collider(this.player, ground); this.physics.add.collider(this.enemy, ground);
 
-        this.enemy = this.physics.add.sprite(774, 400, this.p2Name).setScale(0.4).setFlipX(true); 
-        this.enemy.setCollideWorldBounds(true); 
-        this.physics.add.collider(this.enemy, ground);
-
-        // Format names for UI
         let p1Display = (this.p1Name === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p1Name.toUpperCase();
         let p2Display = (this.p2Name === 'aadhiljunise') ? 'AADHIL JUNISE' : this.p2Name.toUpperCase();
 
-        // UI Text
         this.add.text(50, 30, p1Display, { fontSize: '24px', fill: '#fff', fontStyle: 'bold' });
         this.playerHealthBar = this.add.rectangle(50, 60, 300, 20, 0x2ecc71).setOrigin(0, 0.5);
         this.p1SpecialText = this.add.text(50, 80, 'Special (F): READY', { fontSize: '16px', fill: '#f1c40f' });
@@ -258,33 +245,24 @@ class GameScene extends Phaser.Scene {
         
         this.add.text(512, 30, `MODE: ${this.difficulty.toUpperCase()}`, { fontSize: '20px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
 
-        // Keyboard Controls
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-        
         this.punchKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
         this.kickKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
         this.specialKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
 
-        // MOBILE TOUCH BUTTONS
         this.createTouchButton(100, 480, '◀', 0x95a5a6, () => { this.btnLeftPressed = true; }, () => { this.btnLeftPressed = false; });
         this.createTouchButton(220, 480, '▶', 0x95a5a6, () => { this.btnRightPressed = true; }, () => { this.btnRightPressed = false; });
         this.createTouchButton(160, 380, '▲', 0x95a5a6, () => { this.btnJumpPressed = true; }, () => { this.btnJumpPressed = false; });
-
         this.createTouchButton(850, 480, 'PUNCH', 0xe74c3c, () => this.doPlayerAttack('punch'), () => {});
         this.createTouchButton(700, 480, 'KICK', 0x3498db, () => this.doPlayerAttack('kick'), () => {});
         this.createTouchButton(550, 480, 'SPECIAL', 0xf1c40f, () => { if(this.p1SpecialReady) this.useSpecial(this.p1Name, true); }, () => {});
     }
 
     createTouchButton(x, y, label, color, callbackDown, callbackUp) {
-        let btn = this.add.text(x, y, label, { 
-            fontSize: '24px', fill: '#fff', fontStyle: 'bold',
-            backgroundColor: Phaser.Display.Color.IntegerToColor(color).rgba, 
-            padding: { x: 20, y: 15 }
-        }).setOrigin(0.5).setInteractive().setAlpha(0.6);
-
+        let btn = this.add.text(x, y, label, { fontSize: '24px', fill: '#fff', fontStyle: 'bold', backgroundColor: Phaser.Display.Color.IntegerToColor(color).rgba, padding: { x: 20, y: 15 } }).setOrigin(0.5).setInteractive().setAlpha(0.6);
         btn.on('pointerdown', () => { btn.setAlpha(1); callbackDown(); });
         btn.on('pointerup', () => { btn.setAlpha(0.6); callbackUp(); });
         btn.on('pointerout', () => { btn.setAlpha(0.6); callbackUp(); });
@@ -293,44 +271,22 @@ class GameScene extends Phaser.Scene {
     update() {
         if (this.isGameOver) return;
 
-        let enemySpeed = 150;
-        let attackChance = 0.02;
-        let specialChance = 0.01;
-        let enemyDamage = 10;
+        let enemySpeed = 150; let attackChance = 0.02; let specialChance = 0.01; let enemyDamage = 10;
+        if (this.difficulty === 'Easy') { enemySpeed = 80; attackChance = 0.008; specialChance = 0.003; enemyDamage = 5; } 
+        else if (this.difficulty === 'Hard') { enemySpeed = 250; attackChance = 0.05; specialChance = 0.03; enemyDamage = 15; }
 
-        if (this.difficulty === 'Easy') {
-            enemySpeed = 80;
-            attackChance = 0.008;
-            specialChance = 0.003;
-            enemyDamage = 5;
-        } else if (this.difficulty === 'Hard') {
-            enemySpeed = 250;
-            attackChance = 0.05;
-            specialChance = 0.03;
-            enemyDamage = 15;
-        }
+        if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) { this.player.setVelocityX(-250); } 
+        else if (this.cursors.right.isDown || this.keyD.isDown || this.btnRightPressed) { this.player.setVelocityX(250); } 
+        else { this.player.setVelocityX(0); }
 
-        // Player Movement
-        if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) {
-            this.player.setVelocityX(-250);
-        } else if (this.cursors.right.isDown || this.keyD.isDown || this.btnRightPressed) {
-            this.player.setVelocityX(250);
-        } else {
-            this.player.setVelocityX(0);
-        }
-
-        // Player Jump
         if ((this.cursors.up.isDown || this.keyW.isDown || this.btnJumpPressed) && this.player.body.touching.down) {
-            this.player.setVelocityY(-600);
-            this.btnJumpPressed = false;
+            this.player.setVelocityY(-600); this.btnJumpPressed = false;
         }
 
-        // Player Attacks
         if (Phaser.Input.Keyboard.JustDown(this.punchKey) && !this.playerAttackCooldown) this.doPlayerAttack('punch');
         if (Phaser.Input.Keyboard.JustDown(this.kickKey) && !this.playerAttackCooldown) this.doPlayerAttack('kick');
         if (Phaser.Input.Keyboard.JustDown(this.specialKey) && this.p1SpecialReady) this.useSpecial(this.p1Name, true);
 
-        // Enemy AI 
         if (Math.abs(this.enemy.x - this.player.x) > 100) {
             if (this.enemy.x > this.player.x) { this.enemy.setVelocityX(-enemySpeed); this.enemy.setFlipX(true); }
             else { this.enemy.setVelocityX(enemySpeed); this.enemy.setFlipX(false); }
@@ -340,11 +296,9 @@ class GameScene extends Phaser.Scene {
             if (Math.random() < specialChance && this.p2SpecialReady) this.useSpecial(this.p2Name, false);
         }
 
-        // Update Health Bars
         this.playerHealthBar.width = (Math.max(0, this.playerHealth) / 100) * 300;
         this.enemyHealthBar.width = (Math.max(0, this.enemyHealth) / 100) * 300;
 
-        // Check Win/Lose
         if (this.enemyHealth <= 0 && !this.isGameOver) this.endGame('PLAYER');
         if (this.playerHealth <= 0 && !this.isGameOver) this.endGame('ENEMY');
     }
@@ -352,6 +306,9 @@ class GameScene extends Phaser.Scene {
     doPlayerAttack(type) {
         this.playerAttackCooldown = true;
         setTimeout(() => this.playerAttackCooldown = false, type === 'kick' ? 600 : 300);
+
+        let sfxKey = type === 'kick' ? 'sfx_kick' : 'sfx_punch';
+        if (!this.sound.mute && this.cache.audio.exists(sfxKey)) this.sound.play(sfxKey, { volume: 0.6 });
 
         let distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.enemy.x, this.enemy.y);
         if (distance < (type === 'kick' ? 220 : 180)) {
@@ -366,6 +323,7 @@ class GameScene extends Phaser.Scene {
     doEnemyAttack(damage) {
         let distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.enemy.x, this.enemy.y);
         if (distance < 200) {
+            if (!this.sound.mute && this.cache.audio.exists('sfx_punch')) this.sound.play('sfx_punch', { volume: 0.4 }); 
             this.playerHealth -= damage;
             this.enemy.x += (this.enemy.x < this.player.x ? 30 : -30);
             this.player.setTint(0xff0000);
@@ -374,6 +332,8 @@ class GameScene extends Phaser.Scene {
     }
 
     useSpecial(character, isPlayer) {
+        if (!this.sound.mute && this.cache.audio.exists('sfx_special')) this.sound.play('sfx_special', { volume: 0.7 });
+
         let targetHealth = isPlayer ? 'enemyHealth' : 'playerHealth';
         let targetSprite = isPlayer ? this.enemy : this.player;
         let attackerSprite = isPlayer ? this.player : this.enemy;
@@ -383,54 +343,21 @@ class GameScene extends Phaser.Scene {
         } else { this.p2SpecialReady = false; this.time.delayedCall(5000, () => { this.p2SpecialReady = true; }); }
 
         switch (character) {
-            case 'aadhil': 
-                this.showFloatingText("ESP32 ZAP!", attackerSprite); 
-                this[targetHealth] -= 25; 
-                this.animateLightning(attackerSprite, targetSprite); 
-                targetSprite.setTint(0x00ffff); 
-                setTimeout(() => targetSprite.clearTint(), 500); 
-                break;
-            case 'adhya': 
-                this.showFloatingText("Zzz... Healed!", attackerSprite); 
-                if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 30); 
-                else this.enemyHealth = Math.min(100, this.enemyHealth + 30); 
-                this.animateHeal(attackerSprite); 
-                break;
-            case 'shifana': 
-                this.showFloatingText("FLASH BANG!", attackerSprite); 
-                this.animateFlash(targetSprite); 
-                targetSprite.body.moves = false; 
-                setTimeout(() => { targetSprite.body.moves = true; }, 2000); 
-                break;
-            case 'abhinanda': 
-                this.showFloatingText("TRASH TALK!", attackerSprite); 
-                this[targetHealth] -= 15; 
-                this.animateSoundWaves(attackerSprite); 
-                break;
-            case 'muthalib': 
-                this.showFloatingText("INVINCIBLE!", attackerSprite); 
-                if (isPlayer) this.playerHealth += 15; 
-                this.animateGoldShield(attackerSprite); 
-                break;
-            case 'aadhiljunise':
-                // YOUR ULTIMATE MOVE 😈
-                this.showFloatingText("SYSTEM OVERRIDE!", attackerSprite);
-                this[targetHealth] -= 30; // Massive damage
-                if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 20); // Heal because you fixed the bugs
-                else this.enemyHealth = Math.min(100, this.enemyHealth + 20);
-                this.animateCodeRain(targetSprite); // New animation
-                break;
+            case 'aadhil': this.showFloatingText("ESP32 ZAP!", attackerSprite); this[targetHealth] -= 25; this.animateLightning(attackerSprite, targetSprite); targetSprite.setTint(0x00ffff); setTimeout(() => targetSprite.clearTint(), 500); break;
+            case 'adhya': this.showFloatingText("Zzz... Healed!", attackerSprite); if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 30); else this.enemyHealth = Math.min(100, this.enemyHealth + 30); this.animateHeal(attackerSprite); break;
+            case 'shifana': this.showFloatingText("FLASH BANG!", attackerSprite); this.animateFlash(targetSprite); targetSprite.body.moves = false; setTimeout(() => { targetSprite.body.moves = true; }, 2000); break;
+            case 'abhinanda': this.showFloatingText("TRASH TALK!", attackerSprite); this[targetHealth] -= 15; this.animateSoundWaves(attackerSprite); break;
+            case 'muthalib': this.showFloatingText("INVINCIBLE!", attackerSprite); if (isPlayer) this.playerHealth += 15; this.animateGoldShield(attackerSprite); break;
+            case 'aadhiljunise': this.showFloatingText("SYSTEM OVERRIDE!", attackerSprite); this[targetHealth] -= 30; if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 20); else this.enemyHealth = Math.min(100, this.enemyHealth + 20); this.animateCodeRain(targetSprite); break;
         }
     }
 
-    // --- ANIMATIONS ---
     animateLightning(attacker, target) {
         let lightning = this.add.graphics(); lightning.lineStyle(6, 0x00ffff, 1); lightning.beginPath(); lightning.moveTo(attacker.x, attacker.y - 50);
         let midX = (attacker.x + target.x) / 2; let midY = (attacker.y + target.y) / 2 - 100;
         lightning.lineTo(midX, midY + 50); lightning.lineTo(midX + 30, midY); lightning.lineTo(target.x, target.y - 50); lightning.strokePath();
         this.tweens.add({ targets: lightning, alpha: 0, duration: 400, onComplete: () => lightning.destroy() });
     }
-    
     animateHeal(target) {
         let healCircle = this.add.circle(target.x, target.y, 50, 0x2ecc71, 0.5);
         this.tweens.add({ targets: healCircle, scale: 2, alpha: 0, duration: 800, onComplete: () => healCircle.destroy() });
@@ -439,55 +366,31 @@ class GameScene extends Phaser.Scene {
             this.tweens.add({ targets: plus, y: target.y - 150, alpha: 0, duration: 1000, delay: i * 150, onComplete: () => plus.destroy() });
         }
     }
-    
     animateFlash(target) {
         let flash = this.add.circle(target.x, target.y, 20, 0xffffff, 1);
         this.tweens.add({ targets: flash, scale: 20, alpha: 0, duration: 600, ease: 'Expo.easeOut', onComplete: () => flash.destroy() });
         target.setTint(0xffffff); setTimeout(() => target.clearTint(), 500);
     }
-    
     animateSoundWaves(attacker) {
         for(let i=0; i<3; i++) {
             let wave = this.add.circle(attacker.x, attacker.y, 20).setStrokeStyle(4, 0xff00ff, 1);
             this.tweens.add({ targets: wave, scale: 6, alpha: 0, duration: 800, delay: i * 150, ease: 'Sine.easeOut', onComplete: () => wave.destroy() });
         }
     }
-    
     animateGoldShield(attacker) {
         attacker.setTint(0xffd700); let shield = this.add.circle(attacker.x, attacker.y, 60).setStrokeStyle(6, 0xffd700, 1);
         this.tweens.add({ targets: shield, scale: 1.3, alpha: 0.2, yoyo: true, repeat: 3, duration: 300, onComplete: () => { shield.destroy(); attacker.clearTint(); } });
     }
-
-    // NEW ANIMATION FOR AADHIL JUNISE
     animateCodeRain(target) {
-        target.setTint(0x00ff00); // Matrix green
-        
-        // Spawn floating code symbols
+        target.setTint(0x00ff00);
         for(let i=0; i<6; i++) {
             let symbols = ['</>', '{}', 'AI', '0101', '&&'];
             let codeText = symbols[Phaser.Math.Between(0, symbols.length - 1)];
-            
-            let codeSprite = this.add.text(
-                target.x + Phaser.Math.Between(-60, 60), 
-                target.y - Phaser.Math.Between(50, 150), 
-                codeText, 
-                { fontSize: '28px', fill: '#00ff00', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }
-            ).setOrigin(0.5);
-
-            this.tweens.add({
-                targets: codeSprite,
-                y: codeSprite.y + 200, // Falls down
-                alpha: 0,
-                duration: 800,
-                delay: i * 100,
-                onComplete: () => codeSprite.destroy()
-            });
+            let codeSprite = this.add.text(target.x + Phaser.Math.Between(-60, 60), target.y - Phaser.Math.Between(50, 150), codeText, { fontSize: '28px', fill: '#00ff00', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5);
+            this.tweens.add({ targets: codeSprite, y: codeSprite.y + 200, alpha: 0, duration: 800, delay: i * 100, onComplete: () => codeSprite.destroy() });
         }
-
-        // Green explosion circle
         let blast = this.add.circle(target.x, target.y, 30, 0x00ff00, 0.6);
         this.tweens.add({ targets: blast, scale: 4, alpha: 0, duration: 500, onComplete: () => blast.destroy() });
-        
         setTimeout(() => target.clearTint(), 600);
     }
 
@@ -499,7 +402,19 @@ class GameScene extends Phaser.Scene {
     endGame(winner) {
         this.isGameOver = true; this.player.setVelocityX(0); this.enemy.setVelocityX(0);
         
-        // ADDED CUSTOM TEXTS FOR YOU
+        if (this.fightMusic) this.fightMusic.stop();
+        
+        // 👇 REPLACE THE SOUND LOGIC WITH THIS 👇
+        if (winner === 'PLAYER') {
+            if (!this.sound.mute && this.cache.audio.exists('sfx_win')) {
+                this.sound.play('sfx_win', { volume: 0.8 });
+            }
+        } else {
+            if (!this.sound.mute && this.cache.audio.exists('sfx_lose')) {
+                this.sound.play('sfx_lose', { volume: 0.8 });
+            }
+        }
+
         const winTexts = { 
             'aadhil': "Aadhil wins! The ESP32 short-circuited the competition.", 
             'muthalib': "Muthalib wins! Was there any doubt? (Spoiler: No).", 
@@ -508,7 +423,6 @@ class GameScene extends Phaser.Scene {
             'abhinanda': "Abhinanda wins! She literally talked the opponent to defeat.",
             'aadhiljunise': "Aadhil Junise wins! Code compiled successfully with 0 errors. GG!"
         };
-        
         const loseTexts = { 
             'aadhil': "Aadhil lost because he spent the whole fight debugging the hitbox.", 
             'muthalib': "Muthalib lost, but his confidence remains at 100%.", 
