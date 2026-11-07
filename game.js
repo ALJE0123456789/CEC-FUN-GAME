@@ -39,9 +39,12 @@ class MainMenu extends Phaser.Scene {
     }
 
     create() {
-        this.cameras.main.setBackgroundColor('#1a1a1a');
         
-        this.add.text(512, 100, 'FIGHT KARO', { fontSize: '80px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
+          // 👇 ADD THESE TWO LINES HERE 👇
+        this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
+        this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.7); 
+        
+       this.add.text(512, 100, 'FIGHT KARO', { fontSize: '80px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
         this.add.text(512, 170, 'COLLEGE EDITION', { fontSize: '32px', fill: '#ecf0f1' }).setOrigin(0.5);
 
         this.add.text(512, 250, 'HOW TO PLAY', { fontSize: '28px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
@@ -69,23 +72,25 @@ class CharSelectScene extends Phaser.Scene {
     constructor() {
         super('CharSelectScene');
     }
-
     create() {
         this.p1Char = null;
         this.p2Char = null;
         this.activePlayer = 1; 
 
-        this.cameras.main.setBackgroundColor('#2c3e50');
+        // 👇 ADD THESE TWO LINES HERE 👇
+        this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
+        this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.6); 
+
+        // this.cameras.main.setBackgroundColor('#2c3e50'); // You can remove this
+        
         this.add.text(512, 50, 'SELECT YOUR FIGHTERS', { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         
         this.p1Text = this.add.text(250, 100, 'Player 1: PICKING...', { fontSize: '24px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
         this.p2Text = this.add.text(774, 100, 'Player 2: WAITING...', { fontSize: '24px', fill: '#7f8c8d' }).setOrigin(0.5);
 
-        // ADDED aadhiljunise
         const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
         this.sprites = []; 
 
-        // Recalculated spacing to perfectly center 6 characters
         let startX = 512 - ((chars.length - 1) * 140) / 2; 
 
         chars.forEach((char, index) => {
@@ -99,7 +104,6 @@ class CharSelectScene extends Phaser.Scene {
                 this.handleSelection(char, sprite);
             });
             
-            // Display name below the character
             let displayName = (char === 'aadhiljunise') ? 'AADHIL JUNISE' : char.toUpperCase();
             this.add.text(x, y + 120, displayName, { fontSize: '16px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         });
@@ -113,6 +117,8 @@ class CharSelectScene extends Phaser.Scene {
             this.scene.start('DifficultyScene', { p1: this.p1Char, p2: this.p2Char });
         });
     }
+
+    // Keep the handleSelection function exactly as it is...
 
     handleSelection(char, sprite) {
         if (this.activePlayer === 2 && char === this.p1Char) {
