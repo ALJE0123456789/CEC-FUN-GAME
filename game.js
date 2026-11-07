@@ -44,9 +44,12 @@ class MainMenu extends Phaser.Scene {
 
     create() {
         // Safely play BGM if it exists
-        if (this.cache.audio.exists('bgm_menu')) {
-            this.menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
-            this.menuMusic.play();
+         if (this.cache.audio.exists('bgm_menu')) {
+            let existingMusic = this.sound.get('bgm_menu');
+            if (!existingMusic || !existingMusic.isPlaying) {
+                this.menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
+                this.menuMusic.play();
+            }
         }
 
         this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
@@ -73,7 +76,6 @@ class MainMenu extends Phaser.Scene {
         let playBtn = this.add.text(512, 470, 'PLAY', { fontSize: '40px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 40, y: 20 } }).setOrigin(0.5).setInteractive();
         
         playBtn.on('pointerdown', () => { 
-            if (this.menuMusic) this.menuMusic.stop();
             this.scene.start('CharSelectScene'); 
         });
         playBtn.on('pointerover', () => playBtn.setStyle({ backgroundColor: '#27ae60' }));
@@ -90,10 +92,13 @@ class CharSelectScene extends Phaser.Scene {
     }
 
     create() {
-        if (this.cache.audio.exists('bgm_menu')) {
-            this.menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.3 });
-            this.menuMusic.play();
-        }
+        // 👇 DELETE the old music code and replace it with this 👇
+        this.menuMusic = this.sound.get('bgm_menu');
+
+        this.p1Char = null;
+        this.p2Char = null;
+        this.activePlayer = 1; 
+        
 
         this.p1Char = null;
         this.p2Char = null;
@@ -128,8 +133,8 @@ class CharSelectScene extends Phaser.Scene {
         this.startBtn = this.add.text(512, 520, 'CONTINUE TO DIFFICULTY', { fontSize: '32px', fill: '#2ecc71', fontStyle: 'bold', backgroundColor: '#000', padding: { x: 20, y: 10 } }).setOrigin(0.5).setVisible(false);
 
         this.startBtn.setInteractive();
-        this.startBtn.on('pointerdown', () => {
-            if (this.menuMusic) this.menuMusic.stop();
+                this.startBtn.on('pointerdown', () => {
+            if (this.menuMusic) this.menuMusic.stop(); // 👈 STOP the music HERE
             this.scene.start('DifficultyScene', { p1: this.p1Char, p2: this.p2Char });
         });
     }
