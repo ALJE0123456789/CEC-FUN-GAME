@@ -2,15 +2,64 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FightKaro Clone</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; background-color: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        #game-container { width: 1024px; height: 576px; }
+        body {
+            margin: 0; padding: 0; background-color: #1a1a1a;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden; font-family: Arial, sans-serif;
+        }
+        
+        /* Fullscreen Button */
+        #fs-btn {
+            position: absolute; top: 10px; right: 10px; z-index: 1000;
+            padding: 10px 15px; background: rgba(0,0,0,0.5); color: white;
+            border: 2px solid white; border-radius: 5px; cursor: pointer; font-weight: bold;
+        }
+
+        /* Portrait Mode Warning */
+        #rotate-warning {
+            display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #1a1a1a; color: white; z-index: 9999;
+            flex-direction: column; justify-content: center; align-items: center; text-align: center;
+        }
+
+        /* Show warning on mobile portrait */
+        @media (max-width: 900px) and (orientation: portrait) {
+            #game-container { display: none !important; }
+            #rotate-warning { display: flex !important; }
+            #fs-btn { display: none; }
+        }
     </style>
 </head>
 <body>
+
+    <!-- Rotate Warning -->
+    <div id="rotate-warning">
+        <h1>🔄 Rotate Your Phone</h1>
+        <p>This game is best played in landscape mode.</p>
+    </div>
+
+    <!-- Fullscreen Button -->
+    <button id="fs-btn">⛶ Fullscreen</button>
+
+    <!-- Game Container -->
     <div id="game-container"></div>
+
     <script src="game.js"></script>
+    <script>
+        // Fullscreen logic
+        document.getElementById('fs-btn').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        });
+    </script>
 </body>
 </html>

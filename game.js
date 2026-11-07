@@ -45,8 +45,8 @@ class MainMenu extends Phaser.Scene {
         this.add.text(512, 250, 'HOW TO PLAY', { fontSize: '28px', fill: '#3498db', fontStyle: 'bold' }).setOrigin(0.5);
         
         let controlsText = 
-            "Move: Arrow Keys\n" +
-            "Jump: Up Arrow\n" +
+            "Move: Arrow Keys / On-Screen Buttons\n" +
+            "Jump: Up Arrow / On-Screen Button\n" +
             "Punch (J): Fast, low damage\n" +
             "Kick (K): Slow, high damage\n" +
             "Special (F): Character's Ultimate";
@@ -145,6 +145,11 @@ class GameScene extends Phaser.Scene {
         this.p2SpecialReady = true;
         this.playerAttackCooldown = false;
         
+        // Mobile Movement Variables
+        this.btnLeftPressed = false;
+        this.btnRightPressed = false;
+        this.btnJumpPressed = false;
+
         this.cameras.main.setBackgroundColor('#2c3e50'); 
         this.physics.world.setBounds(0, 0, 1024, 576);
 
@@ -173,36 +178,41 @@ class GameScene extends Phaser.Scene {
         this.kickKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
         this.specialKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
 
-        // --- MOBILE TOUCH BUTTONS ---
-        this.createTouchButton(850, 480, 'PUNCH (J)', 0xe74c3c, () => this.doPlayerAttack('punch'));
-        this.createTouchButton(680, 480, 'KICK (K)', 0x3498db, () => this.doPlayerAttack('kick'));
-        this.createTouchButton(510, 480, 'SPECIAL (F)', 0xf1c40f, () => { if(this.p1SpecialReady) this.useSpecial(this.p1Name, true); });
+        // --- MOBILE TOUCH BUTTONS (Left Side: Movement) ---
+        this.createTouchButton(100, 480, '◀', 0x95a5a6, () => { this.btnLeftPressed = true; }, () => { this.btnLeftPressed = false; });
+        this.createTouchButton(220, 480, '▶', 0x95a5a6, () => { this.btnRightPressed = true; }, () => { this.btnRightPressed = false; });
+        this.createTouchButton(160, 380, '▲', 0x95a5a6, () => { this.btnJumpPressed = true; }, () => { this.btnJumpPressed = false; });
+
+        // --- MOBILE TOUCH BUTTONS (Right Side: Attacks) ---
+        this.createTouchButton(850, 480, 'PUNCH', 0xe74c3c, () => this.doPlayerAttack('punch'), () => {});
+        this.createTouchButton(700, 480, 'KICK', 0x3498db, () => this.doPlayerAttack('kick'), () => {});
+        this.createTouchButton(550, 480, 'SPECIAL', 0xf1c40f, () => { if(this.p1SpecialReady) this.useSpecial(this.p1Name, true); }, () => {});
     }
 
-    createTouchButton(x, y, label, color, callback) {
+    createTouchButton(x, y, label, color, callbackDown, callbackUp) {
         let btn = this.add.text(x, y, label, { 
-            fontSize: '20px', fill: '#fff', fontStyle: 'bold',
+            fontSize: '24px', fill: '#fff', fontStyle: 'bold',
             backgroundColor: Phaser.Display.Color.IntegerToColor(color).rgba, 
-            padding: { x: 15, y: 10 }
-        }).setOrigin(0.5).setInteractive();
+            padding: { x: 20, y: 15 }
+        }).setOrigin(0.5).setInteractive().setAlpha(0.6);
 
-        // Make it semi-transparent so it doesn't block the view
-        btn.setAlpha(0.6);
-
-        btn.on('pointerover', () => btn.setAlpha(1));
-        btn.on('pointerout', () => btn.setAlpha(0.6));
-        btn.on('pointerdown', callback);
+        btn.on('pointerdown', () => { btn.setAlpha(1); callbackDown(); });
+        btn.on('pointerup', () => { btn.setAlpha(0.6); callbackUp(); });
+        btn.on('pointerout', () => { btn.setAlpha(0.6); callbackUp(); }); // Failsafe if finger slides off
     }
 
     update() {
         if (this.isGameOver) return;
 
-        // Player Movement
-        if (this.cursors.left.isDown) this.player.setVelocityX(-250);
-        else if (this.cursors.right.isDown) this.player.setVelocityX(250);
+        // Player Movement (Keyboard OR Mobile Buttons)
+        if (this.cursors.left.isDown || this.btnLeftPressed) this.player.setVelocityX(-250);
+        else if (this.cursors.right.isDown || this.btnRightPressed) this.player.setVelocityX(250);
         else this.player.setVelocityX(0);
 
-        if (this.cursors.up.isDown && this.player.body.touching.down) this.player.setVelocityY(-600);
+        if ((this.cursors.up.isDown || this.btnJumpPressed) && this.player.body.touching.down) {
+            this.player.setVelocityY(-600);
+            this.btnJumpPressed = false; // Reset mobile jump
+        }
 
         // Keyboard Attacks
         if (Phaser.Input.Keyboard.JustDown(this.punchKey) && !this.playerAttackCooldown) this.doPlayerAttack('punch');
@@ -233,22 +243,21 @@ class GameScene extends Phaser.Scene {
     // ==========================================
     doPlayerAttack(type) {
         this.playerAttackCooldown = true;
-        setTimeout(() => this.playerAttackCooldown = false, type === 'kick' ? 600 : 300); // Kick is slower
+        setTimeout(() => this.playerAttackCooldown = false, type === 'kick' ? 600 : 300);
 
         let distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.enemy.x, this.enemy.y);
-        let range = type === 'kick' ? 220 : 180; // Kick has slightly longer range
-        let damage = type === 'kick' ? 15 : 10;  // Kick does more damage
+        let range = type === 'kick' ? 220 : 180;
+        let damage = type === 'kick' ? 15 : 10;
 
         if (distance < range) {
             this.enemyHealth -= damage;
-            this.player.x += (this.player.x < this.enemy.x ? (type === 'kick' ? 50 : 20) : (type === 'kick' ? -50 : -20)); // Kick lunges more
+            this.player.x += (this.player.x < this.enemy.x ? (type === 'kick' ? 50 : 20) : (type === 'kick' ? -50 : -20));
             
-            // Visual effect based on attack type
             if (type === 'kick') {
-                this.enemy.setTint(0xffaa00); // Orange flash for kick
-                this.cameras.main.shake(100, 0.005); // Small screen shake
+                this.enemy.setTint(0xffaa00);
+                this.cameras.main.shake(100, 0.005);
             } else {
-                this.enemy.setTint(0xff0000); // Red flash for punch
+                this.enemy.setTint(0xff0000);
             }
             setTimeout(() => this.enemy.clearTint(), 150);
         }
@@ -265,7 +274,7 @@ class GameScene extends Phaser.Scene {
     }
 
     // ==========================================
-    // SPECIAL POWERS & ANIMATIONS (Unchanged)
+    // SPECIAL POWERS & ANIMATIONS
     // ==========================================
     useSpecial(character, isPlayer) {
         let targetHealth = isPlayer ? 'enemyHealth' : 'playerHealth';
@@ -405,6 +414,7 @@ class GameScene extends Phaser.Scene {
         exitBtn.on('pointerdown', () => { this.scene.start('CharSelectScene'); });
     }
 }
+
 // ==========================================
 // INITIALIZE THE GAME (MUST BE AT THE BOTTOM)
 // ==========================================
@@ -413,6 +423,11 @@ const config = {
     width: 1024,
     height: 576,
     parent: 'game-container',
+    // THIS IS THE MAGIC LINE THAT MAKES IT RESPONSIVE ON MOBILE
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     physics: {
         default: 'arcade',
         arcade: { gravity: { y: 1000 }, debug: false }
