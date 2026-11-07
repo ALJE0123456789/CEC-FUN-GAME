@@ -6,8 +6,10 @@ class BootScene extends Phaser.Scene {
         super('BootScene'); 
     }
 
-    preload() {
-        // ADDED aadhiljunise
+     preload() {
+        // background image
+        this.load.image('background', 'assets/background.png');
+        
         const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
         chars.forEach(c => this.load.image(c, `assets/${c}.png`));
 
@@ -213,9 +215,19 @@ class GameScene extends Phaser.Scene {
         this.btnJumpPressed = false;
 
         this.cameras.main.setBackgroundColor('#2c3e50'); 
+        
+        // 👇 ADD THE BACKGROUND IMAGE HERE 👇
+        // The first two numbers (512, 288) center it, and setDisplaySize makes it fit the screen.
+        this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
+        
+        // 👇 ADD A DARK OVERLAY SO THE UI IS READABLE 👇
+        // This draws a black box over the background at 40% opacity.
+        this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.5);
+
         this.physics.world.setBounds(0, 0, 1024, 576);
 
         const ground = this.add.rectangle(512, 550, 1024, 50, 0x7f8c8d);
+       
         this.physics.add.existing(ground, true); 
 
         this.player = this.physics.add.sprite(250, 400, this.p1Name).setScale(0.4);
