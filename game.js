@@ -6,19 +6,25 @@ class BootScene extends Phaser.Scene {
         super('BootScene'); 
     }
 
-    preload() {
+        preload() {
         this.load.image('background', 'assets/background.png');
         const chars = ['aadhil', 'muthalib', 'adhya', 'shifana', 'abhinanda', 'aadhiljunise'];
+        
+        // Load character images
         chars.forEach(c => this.load.image(c, `assets/${c}.png`));
 
-        // Load Audio
+        // Load base audio
         this.load.audio('bgm_menu', 'assets/bgm_menu.mp3'); 
         this.load.audio('bgm_fight', 'assets/bgm_fight.mp3'); 
         this.load.audio('sfx_punch', 'assets/sfx_punch.mp3');
         this.load.audio('sfx_kick', 'assets/sfx_kick.mp3');
-        this.load.audio('sfx_special', 'assets/sfx_special.mp3');
         this.load.audio('sfx_win', 'assets/sfx_win.mp3');
-        this.load.audio('sfx_lose', 'assets/sfx_lose.mp3');
+        this.load.audio('sfx_lose', 'assets/lose.mp3'); // Or sfx_lose.mp3
+        
+        // 👇 AUTOMATICALLY LOAD ALL 6 CUSTOM POWER SOUNDS 👇
+        chars.forEach(c => {
+            this.load.audio(`${c}_power`, `assets/${c}_power.mp3`);
+        });
 
         // Image Fallback
         this.load.on('loaderror', (file) => {
@@ -28,7 +34,6 @@ class BootScene extends Phaser.Scene {
             g.generateTexture(file.key, 100, 200);
         });
     }
-
     create() {
         this.scene.start('MainMenu');
     }
@@ -343,33 +348,86 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    useSpecial(character, isPlayer) {
-        if (!this.sound.mute && this.cache.audio.exists('sfx_special')) this.sound.play('sfx_special', { volume: 0.7 });
+        useSpecial(character, isPlayer) {
+        // 👇 PLAY THE CUSTOM POWER SOUND BASED ON WHO IS ATTACKING 👇
+        let powerSfxKey = character + '_power';
+        if (!this.sound.mute && this.cache.audio.exists(powerSfxKey)) {
+            this.sound.play(powerSfxKey, { volume: 0.8 });
+        }
 
         let targetHealth = isPlayer ? 'enemyHealth' : 'playerHealth';
         let targetSprite = isPlayer ? this.enemy : this.player;
         let attackerSprite = isPlayer ? this.player : this.enemy;
+        
         if (isPlayer) {
-            this.p1SpecialReady = false; this.p1SpecialText.setText('Special: COOLDOWN...');
-            this.time.delayedCall(5000, () => { this.p1SpecialReady = true; this.p1SpecialText.setText('Special (F): READY'); });
-        } else { this.p2SpecialReady = false; this.time.delayedCall(5000, () => { this.p2SpecialReady = true; }); }
+            this.p1SpecialReady = false; 
+            this.p1SpecialText.setText('Special: COOLDOWN...');
+            this.time.delayedCall(5000, () => { 
+                this.p1SpecialReady = true; 
+                this.p1SpecialText.setText('Special (F): READY'); 
+            });
+        } else { 
+            this.p2SpecialReady = false; 
+            this.time.delayedCall(5000, () => { this.p2SpecialReady = true; }); 
+        }
 
         switch (character) {
-            case 'aadhil': this.showFloatingText("ESP32 ZAP!", attackerSprite); this[targetHealth] -= 25; this.animateLightning(attackerSprite, targetSprite); targetSprite.setTint(0x00ffff); setTimeout(() => targetSprite.clearTint(), 500); break;
-            case 'adhya': this.showFloatingText("Zzz... Healed!", attackerSprite); if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 30); else this.enemyHealth = Math.min(100, this.enemyHealth + 30); this.animateHeal(attackerSprite); break;
-            case 'shifana': this.showFloatingText("FLASH BANG!", attackerSprite); this.animateFlash(targetSprite); targetSprite.body.moves = false; setTimeout(() => { targetSprite.body.moves = true; }, 2000); break;
-            case 'abhinanda': this.showFloatingText("TRASH TALK!", attackerSprite); this[targetHealth] -= 15; this.animateSoundWaves(attackerSprite); break;
-            case 'muthalib': this.showFloatingText("INVINCIBLE!", attackerSprite); if (isPlayer) this.playerHealth += 15; this.animateGoldShield(attackerSprite); break;
-            case 'aadhiljunise': this.showFloatingText("SYSTEM OVERRIDE!", attackerSprite); this[targetHealth] -= 30; if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 20); else this.enemyHealth = Math.min(100, this.enemyHealth + 20); this.animateCodeRain(targetSprite); break;
+            case 'aadhil': 
+                this.showFloatingText("ESP32 ZAP!", attackerSprite); 
+                this[targetHealth] -= 25; 
+                this.animateLightning(attackerSprite, targetSprite); 
+                targetSprite.setTint(0x00ffff); 
+                setTimeout(() => targetSprite.clearTint(), 500); 
+                break;
+            case 'adhya': 
+                this.showFloatingText("Zzz... Healed!", attackerSprite); 
+                if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 30); 
+                else this.enemyHealth = Math.min(100, this.enemyHealth + 30); 
+                this.animateHeal(attackerSprite); 
+                break;
+            case 'shifana': 
+                this.showFloatingText("FLASH BANG!", attackerSprite); 
+                this.animateFlash(targetSprite); 
+                targetSprite.body.moves = false; 
+                setTimeout(() => { targetSprite.body.moves = true; }, 2000); 
+                break;
+            case 'abhinanda': 
+                this.showFloatingText("TRASH TALK!", attackerSprite); 
+                this[targetHealth] -= 15; 
+                this.animateSoundWaves(attackerSprite); 
+                break;
+            case 'muthalib': 
+                this.showFloatingText("INVINCIBLE!", attackerSprite); 
+                if (isPlayer) this.playerHealth += 15; 
+                this.animateGoldShield(attackerSprite); 
+                break;
+            case 'aadhiljunise': 
+                this.showFloatingText("SYSTEM OVERRIDE!", attackerSprite); 
+                this[targetHealth] -= 30; 
+                if (isPlayer) this.playerHealth = Math.min(100, this.playerHealth + 20); 
+                else this.enemyHealth = Math.min(100, this.enemyHealth + 20); 
+                this.animateCodeRain(targetSprite); 
+                break;
         }
     }
 
+    // ==========================================
+    // ANIMATIONS
+    // ==========================================
     animateLightning(attacker, target) {
-        let lightning = this.add.graphics(); lightning.lineStyle(6, 0x00ffff, 1); lightning.beginPath(); lightning.moveTo(attacker.x, attacker.y - 50);
-        let midX = (attacker.x + target.x) / 2; let midY = (attacker.y + target.y) / 2 - 100;
-        lightning.lineTo(midX, midY + 50); lightning.lineTo(midX + 30, midY); lightning.lineTo(target.x, target.y - 50); lightning.strokePath();
+        let lightning = this.add.graphics(); 
+        lightning.lineStyle(6, 0x00ffff, 1); 
+        lightning.beginPath(); 
+        lightning.moveTo(attacker.x, attacker.y - 50);
+        let midX = (attacker.x + target.x) / 2; 
+        let midY = (attacker.y + target.y) / 2 - 100;
+        lightning.lineTo(midX, midY + 50); 
+        lightning.lineTo(midX + 30, midY); 
+        lightning.lineTo(target.x, target.y - 50); 
+        lightning.strokePath();
         this.tweens.add({ targets: lightning, alpha: 0, duration: 400, onComplete: () => lightning.destroy() });
     }
+
     animateHeal(target) {
         let healCircle = this.add.circle(target.x, target.y, 50, 0x2ecc71, 0.5);
         this.tweens.add({ targets: healCircle, scale: 2, alpha: 0, duration: 800, onComplete: () => healCircle.destroy() });
@@ -378,21 +436,27 @@ class GameScene extends Phaser.Scene {
             this.tweens.add({ targets: plus, y: target.y - 150, alpha: 0, duration: 1000, delay: i * 150, onComplete: () => plus.destroy() });
         }
     }
+
     animateFlash(target) {
         let flash = this.add.circle(target.x, target.y, 20, 0xffffff, 1);
         this.tweens.add({ targets: flash, scale: 20, alpha: 0, duration: 600, ease: 'Expo.easeOut', onComplete: () => flash.destroy() });
-        target.setTint(0xffffff); setTimeout(() => target.clearTint(), 500);
+        target.setTint(0xffffff); 
+        setTimeout(() => target.clearTint(), 500);
     }
+
     animateSoundWaves(attacker) {
         for(let i=0; i<3; i++) {
             let wave = this.add.circle(attacker.x, attacker.y, 20).setStrokeStyle(4, 0xff00ff, 1);
             this.tweens.add({ targets: wave, scale: 6, alpha: 0, duration: 800, delay: i * 150, ease: 'Sine.easeOut', onComplete: () => wave.destroy() });
         }
     }
+
     animateGoldShield(attacker) {
-        attacker.setTint(0xffd700); let shield = this.add.circle(attacker.x, attacker.y, 60).setStrokeStyle(6, 0xffd700, 1);
+        attacker.setTint(0xffd700); 
+        let shield = this.add.circle(attacker.x, attacker.y, 60).setStrokeStyle(6, 0xffd700, 1);
         this.tweens.add({ targets: shield, scale: 1.3, alpha: 0.2, yoyo: true, repeat: 3, duration: 300, onComplete: () => { shield.destroy(); attacker.clearTint(); } });
     }
+
     animateCodeRain(target) {
         target.setTint(0x00ff00);
         for(let i=0; i<6; i++) {
@@ -411,17 +475,16 @@ class GameScene extends Phaser.Scene {
         this.tweens.add({ targets: txt, y: sprite.y - 200, alpha: 0, duration: 1200, onComplete: () => txt.destroy() });
     }
 
-            endGame(winner) {
+    // ==========================================
+    // GAME OVER
+    // ==========================================
+    endGame(winner) {
         this.isGameOver = true; 
         this.player.setVelocityX(0); 
         this.enemy.setVelocityX(0);
         
-        // Stop fight music safely
-        try {
-            if (this.fightMusic) this.fightMusic.stop();
-        } catch (e) { console.log("Audio error:", e); }
+        try { if (this.fightMusic) this.fightMusic.stop(); } catch (e) {}
 
-        // Play Win/Lose sound safely
         try {
             if (!this.sound.mute) {
                 if (winner === 'PLAYER' && this.cache.audio.exists('sfx_win')) {
@@ -430,7 +493,7 @@ class GameScene extends Phaser.Scene {
                     this.sound.play('sfx_lose', { volume: 0.8 });
                 }
             }
-        } catch (e) { console.log("Audio error:", e); }
+        } catch (e) {}
 
         const winTexts = { 
             'aadhil': "Aadhil wins! The ESP32 short-circuited the competition.", 
@@ -458,38 +521,26 @@ class GameScene extends Phaser.Scene {
         this.add.text(512, 230, funnyText, { fontSize: '24px', fill: '#2ecc71', fontStyle: 'italic', wordWrap: { width: 800 } }).setOrigin(0.5);
         this.add.text(512, 280, loserText, { fontSize: '20px', fill: '#e74c3c', wordWrap: { width: 800 } }).setOrigin(0.5);
         
-        // --- REPLAY BUTTON ---
         let replayBtn = this.add.text(512, 380, 'REPLAY', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
         
         replayBtn.on('pointerdown', () => { 
-            // FORCE STOP both sounds by their key names
             this.sound.stopByKey('sfx_win');
             this.sound.stopByKey('sfx_lose');
-            
-            // Restart the scene
             this.scene.restart({ p1: this.p1Name, p2: this.p2Name, diff: this.difficulty }); 
         });
         
-        // --- EXIT BUTTON ---
         let exitBtn = this.add.text(512, 460, 'CHANGE CHARACTERS', { fontSize: '24px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } }).setOrigin(0.5).setInteractive();
         
         exitBtn.on('pointerdown', () => { 
-            // FORCE STOP both sounds by their key names
             this.sound.stopByKey('sfx_win');
             this.sound.stopByKey('sfx_lose');
             
-            // Restart the menu music
             if (this.cache.audio.exists('bgm_menu')) {
                 let menuMusic = this.sound.get('bgm_menu');
-                if (!menuMusic) {
-                    menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
-                }
-                if (!menuMusic.isPlaying) {
-                    menuMusic.play();
-                }
+                if (!menuMusic) menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
+                if (!menuMusic.isPlaying) menuMusic.play();
             }
             
-            // Go back to character select
             this.scene.start('CharSelectScene'); 
         });
     }
