@@ -353,6 +353,7 @@ class GameScene extends Phaser.Scene {
         this.p2Name = data.p2 || 'muthalib';
         this.difficulty = data.diff || 'Normal';
         this.gameMode = data.mode || 'ai'; 
+        this.isPaused = false; // NEW: Pause state
     }
 
     create() {
@@ -391,6 +392,38 @@ class GameScene extends Phaser.Scene {
         
         this.add.text(512, 30, `MODE: ${this.gameMode === 'online' ? 'ONLINE PVP' : this.difficulty.toUpperCase()}`, { fontSize: '20px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
 
+        // ==========================================
+        // NEW: PAUSE MENU UI
+        // ==========================================
+        // Pause Button (Top Right)
+                // Pause Button (Middle, under MODE text, between health bars)
+        this.pauseBtn = this.add.text(512, 75, '⏸️ PAUSE', { fontSize: '18px', fill: '#fff', backgroundColor: '#e67e22', padding: { x: 15, y: 5 } })
+            .setOrigin(0.5).setInteractive().setDepth(500);
+        this.pauseBtn.on('pointerdown', () => this.togglePause());
+        // Pause Overlay Container (Hidden initially)
+        this.pauseMenu = this.add.container(0, 0).setVisible(false).setDepth(1000);
+        
+        let pauseBg = this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.85);
+        let pauseTitle = this.add.text(512, 150, 'PAUSED', { fontSize: '64px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
+        
+        // Resume Button
+        let resumeBtn = this.add.text(512, 300, 'RESUME', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
+        resumeBtn.on('pointerdown', () => this.togglePause());
+
+        // Mute Button
+        this.pauseMuteBtn = this.add.text(512, 400, this.sound.mute ? '🔇 SOUND OFF' : '🔊 SOUND ON', { fontSize: '32px', fill: '#fff', backgroundColor: '#34495e', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
+        this.pauseMuteBtn.on('pointerdown', () => {
+            this.sound.mute = !this.sound.mute;
+            this.pauseMuteBtn.setText(this.sound.mute ? '🔇 SOUND OFF' : '🔊 SOUND ON');
+        });
+
+        // Leave Button
+        let leaveBtn = this.add.text(512, 500, 'LEAVE GAME', { fontSize: '32px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
+        leaveBtn.on('pointerdown', () => this.leaveGame());
+
+        this.pauseMenu.add([pauseBg, pauseTitle, resumeBtn, this.pauseMuteBtn, leaveBtn]);
+        // ==========================================
+
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
@@ -424,24 +457,22 @@ class GameScene extends Phaser.Scene {
 
             // 2. LISTEN FOR NETWORK EVENTS
             conn.on('data', (data) => {
+                if (this.isPaused || this.isGameOver) return; // Ignore network updates if paused
+
                 if (data.type === 'move') {
                     if (isHost) {
-                        // Host receives Guest's position (Guest controls enemy)
                         this.enemy.x = data.x;
                         this.enemy.y = data.y;
                         this.enemy.setFlipX(data.flipX);
                     } else {
-                        // Guest receives Host's position (Host controls player)
                         this.player.x = data.x;
                         this.player.y = data.y;
                         this.player.setFlipX(data.flipX);
                     }
                 } else if (data.type === 'health') {
-                    // 3. SYNC HEALTH (Fixes ending & health bars)
                     this.playerHealth = data.p1Health;
                     this.enemyHealth = data.p2Health;
                     
-                    // Play hurt animation on the receiving end
                     if (data.attacker === 'p1') {
                         this.enemy.setTint(0xff0000);
                         setTimeout(() => this.enemy.clearTint(), 150);
@@ -451,7 +482,60 @@ class GameScene extends Phaser.Scene {
                     }
                 }
             });
+
+            // 3. NEW: HANDLE OPPONENT LEAVING
+            conn.on('close', () => {
+                if (!this.isGameOver) {
+                    this.isGameOver = true;
+                    if (this.fightMusic) this.fightMusic.stop();
+                    this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.9).setDepth(1001);
+                    this.add.text(512, 288, 'OPPONENT LEFT THE GAME', { fontSize: '50px', fill: '#e74c3c', fontStyle: 'bold' }).setOrigin(0.5).setDepth(1002);
+                    this.time.delayedCall(3000, () => { this.scene.start('MainMenu'); });
+                }
+            });
         }
+    }
+
+    togglePause() {
+        this.isPaused = !this.isPaused;
+        
+        if (this.isPaused) {
+            this.physics.pause();
+            if (this.syncTimer) this.syncTimer.paused = true; // Stop sending network data
+            this.pauseMenu.setVisible(true);
+            this.pauseBtn.setVisible(false);
+        } else {
+            this.physics.resume();
+            if (this.syncTimer) this.syncTimer.paused = false;
+            this.pauseMenu.setVisible(false);
+            this.pauseBtn.setVisible(true);
+        }
+    }
+
+    leaveGame() {
+        this.isGameOver = true;
+        if (this.fightMusic) this.fightMusic.stop();
+        
+        // Clean up audio
+        this.sound.stopByKey('sfx_win'); 
+        this.sound.stopByKey('sfx_lose');
+
+        // Clean up Network
+        if (this.gameMode === 'online' && conn) { 
+            conn.close(); 
+            peer.destroy(); 
+            conn = null; 
+            peer = null; 
+        }
+
+        // Play Menu Music
+        if (this.cache.audio.exists('bgm_menu')) {
+            let menuMusic = this.sound.get('bgm_menu');
+            if (!menuMusic) menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
+            if (!menuMusic.isPlaying) menuMusic.play();
+        }
+        
+        this.scene.start('MainMenu');
     }
 
     createTouchButton(x, y, label, color, callbackDown, callbackUp) {
@@ -462,7 +546,8 @@ class GameScene extends Phaser.Scene {
     }
 
     update() {
-        if (this.isGameOver) return;
+        // NEW: Stop the game loop if paused or game over
+        if (this.isGameOver || this.isPaused) return;
 
         // HOST CONTROLS PLAYER 1
         if (this.gameMode === 'ai' || (this.gameMode === 'online' && isHost)) {
@@ -519,7 +604,7 @@ class GameScene extends Phaser.Scene {
     }
 
     doLocalAttack(type) {
-        if (this.playerAttackCooldown) return;
+        if (this.playerAttackCooldown || this.isPaused) return;
         this.playerAttackCooldown = true;
         setTimeout(() => this.playerAttackCooldown = false, type === 'kick' ? 600 : 300);
 
@@ -543,7 +628,7 @@ class GameScene extends Phaser.Scene {
             else { defender.setTint(0xff0000); }
             setTimeout(() => defender.clearTint(), 150);
 
-            // 👇 SYNC HEALTH TO THE OTHER PLAYER 👇
+            // SYNC HEALTH TO THE OTHER PLAYER
             if (this.gameMode === 'online' && conn) {
                 conn.send({ 
                     type: 'health', 
@@ -556,6 +641,8 @@ class GameScene extends Phaser.Scene {
     }
 
     doLocalSpecial() {
+        if (this.isPaused) return;
+        
         let attacker = isHost || this.gameMode === 'ai' ? this.player : this.enemy;
         let characterName = isHost || this.gameMode === 'ai' ? this.p1Name : this.p2Name;
         let isP1 = isHost || this.gameMode === 'ai';
