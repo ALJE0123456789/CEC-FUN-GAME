@@ -399,7 +399,6 @@ class GameScene extends Phaser.Scene {
         this.kickKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
         this.specialKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
 
-        // TOUCH CONTROLS
         this.createTouchButton(100, 480, '◀', 0x95a5a6, () => { this.btnLeftPressed = true; }, () => { this.btnLeftPressed = false; });
         this.createTouchButton(220, 480, '▶', 0x95a5a6, () => { this.btnRightPressed = true; }, () => { this.btnRightPressed = false; });
         this.createTouchButton(160, 380, '▲', 0x95a5a6, () => { this.btnJumpPressed = true; }, () => { this.btnJumpPressed = false; });
@@ -407,30 +406,48 @@ class GameScene extends Phaser.Scene {
         this.createTouchButton(700, 480, 'KICK', 0x3498db, () => this.doLocalAttack('kick'), () => {});
         this.createTouchButton(550, 480, 'SPECIAL', 0xf1c40f, () => this.doLocalSpecial(), () => {});
 
-        // NETWORK SYNC LISTENER
+        // 👇 NEW NETWORK SYNC LOGIC 👇
         if (this.gameMode === 'online' && conn) {
+            // 1. SYNC MOVEMENT EVERY 30MS (Fixes smoothness)
+            this.syncTimer = this.time.addEvent({
+                delay: 30, 
+                callback: () => {
+                    conn.send({
+                        type: 'move',
+                        x: isHost ? this.player.x : this.enemy.x,
+                        y: isHost ? this.player.y : this.enemy.y,
+                        flipX: isHost ? this.player.flipX : this.enemy.flipX
+                    });
+                },
+                loop: true
+            });
+
+            // 2. LISTEN FOR NETWORK EVENTS
             conn.on('data', (data) => {
-                if (data.type === 'sync') {
+                if (data.type === 'move') {
                     if (isHost) {
-                        // Host receives Guest's movement (Guest controls Enemy)
+                        // Host receives Guest's position (Guest controls enemy)
                         this.enemy.x = data.x;
                         this.enemy.y = data.y;
                         this.enemy.setFlipX(data.flipX);
-                        this.playerHealth = data.p1Health;
-                        this.enemyHealth = data.p2Health;
-                        if (data.action === 'punch') this.executeAttack(this.enemy, this.player, 'punch');
-                        if (data.action === 'kick') this.executeAttack(this.enemy, this.player, 'kick');
-                        if (data.action === 'special') this.useSpecial(this.p2Name, false);
                     } else {
-                        // Guest receives Host's movement (Host controls Player)
+                        // Guest receives Host's position (Host controls player)
                         this.player.x = data.x;
                         this.player.y = data.y;
                         this.player.setFlipX(data.flipX);
-                        this.playerHealth = data.p1Health;
-                        this.enemyHealth = data.p2Health;
-                        if (data.action === 'punch') this.executeAttack(this.player, this.enemy, 'punch');
-                        if (data.action === 'kick') this.executeAttack(this.player, this.enemy, 'kick');
-                        if (data.action === 'special') this.useSpecial(this.p1Name, true);
+                    }
+                } else if (data.type === 'health') {
+                    // 3. SYNC HEALTH (Fixes ending & health bars)
+                    this.playerHealth = data.p1Health;
+                    this.enemyHealth = data.p2Health;
+                    
+                    // Play hurt animation on the receiving end
+                    if (data.attacker === 'p1') {
+                        this.enemy.setTint(0xff0000);
+                        setTimeout(() => this.enemy.clearTint(), 150);
+                    } else {
+                        this.player.setTint(0xff0000);
+                        setTimeout(() => this.player.clearTint(), 150);
                     }
                 }
             });
@@ -447,8 +464,6 @@ class GameScene extends Phaser.Scene {
     update() {
         if (this.isGameOver) return;
 
-        let localAction = "";
-
         // HOST CONTROLS PLAYER 1
         if (this.gameMode === 'ai' || (this.gameMode === 'online' && isHost)) {
             if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) { this.player.setVelocityX(-250); } 
@@ -459,15 +474,11 @@ class GameScene extends Phaser.Scene {
                 this.player.setVelocityY(-600); this.btnJumpPressed = false;
             }
 
-            if (Phaser.Input.Keyboard.JustDown(this.punchKey)) localAction = "punch";
-            if (Phaser.Input.Keyboard.JustDown(this.kickKey)) localAction = "kick";
-            if (Phaser.Input.Keyboard.JustDown(this.specialKey)) localAction = "special";
-
-            if (localAction === "punch") this.doLocalAttack('punch');
-            if (localAction === "kick") this.doLocalAttack('kick');
-            if (localAction === "special") this.doLocalSpecial();
+            if (Phaser.Input.Keyboard.JustDown(this.punchKey)) this.doLocalAttack('punch');
+            if (Phaser.Input.Keyboard.JustDown(this.kickKey)) this.doLocalAttack('kick');
+            if (Phaser.Input.Keyboard.JustDown(this.specialKey)) this.doLocalSpecial();
         } 
-        // GUEST CONTROLS PLAYER 2 (Enemy sprite)
+        // GUEST CONTROLS PLAYER 2
         else if (this.gameMode === 'online' && !isHost) {
             if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) { this.enemy.setVelocityX(-250); } 
             else if (this.cursors.right.isDown || this.keyD.isDown || this.btnRightPressed) { this.enemy.setVelocityX(250); } 
@@ -477,13 +488,9 @@ class GameScene extends Phaser.Scene {
                 this.enemy.setVelocityY(-600); this.btnJumpPressed = false;
             }
 
-            if (Phaser.Input.Keyboard.JustDown(this.punchKey)) localAction = "punch";
-            if (Phaser.Input.Keyboard.JustDown(this.kickKey)) localAction = "kick";
-            if (Phaser.Input.Keyboard.JustDown(this.specialKey)) localAction = "special";
-
-            if (localAction === "punch") this.doLocalAttack('punch');
-            if (localAction === "kick") this.doLocalAttack('kick');
-            if (localAction === "special") this.doLocalSpecial();
+            if (Phaser.Input.Keyboard.JustDown(this.punchKey)) this.doLocalAttack('punch');
+            if (Phaser.Input.Keyboard.JustDown(this.kickKey)) this.doLocalAttack('kick');
+            if (Phaser.Input.Keyboard.JustDown(this.specialKey)) this.doLocalSpecial();
         }
 
         // AI LOGIC (Only in AI mode)
@@ -502,24 +509,11 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // SEND NETWORK DATA
-        if (this.gameMode === 'online' && conn && localAction !== "") {
-            conn.send({
-                type: 'sync',
-                x: isHost ? this.player.x : this.enemy.x,
-                y: isHost ? this.player.y : this.enemy.y,
-                flipX: isHost ? this.player.flipX : this.enemy.flipX,
-                p1Health: this.playerHealth,
-                p2Health: this.enemyHealth,
-                action: localAction
-            });
-            // Reset action after sending so it doesn't spam
-            localAction = ""; 
-        }
-
+        // Update Health Bars
         this.playerHealthBar.width = (Math.max(0, this.playerHealth) / 100) * 300;
         this.enemyHealthBar.width = (Math.max(0, this.enemyHealth) / 100) * 300;
 
+        // Check Win/Lose
         if (this.enemyHealth <= 0 && !this.isGameOver) this.endGame('PLAYER');
         if (this.playerHealth <= 0 && !this.isGameOver) this.endGame('ENEMY');
     }
@@ -532,11 +526,10 @@ class GameScene extends Phaser.Scene {
         let sfxKey = type === 'kick' ? 'sfx_kick' : 'sfx_punch';
         if (!this.sound.mute && this.cache.audio.exists(sfxKey)) this.sound.play(sfxKey, { volume: 0.6 });
 
-        if (isHost || this.gameMode === 'ai') {
-            this.executeAttack(this.player, this.enemy, type);
-        } else {
-            this.executeAttack(this.enemy, this.player, type);
-        }
+        let attacker = isHost || this.gameMode === 'ai' ? this.player : this.enemy;
+        let defender = isHost || this.gameMode === 'ai' ? this.enemy : this.player;
+
+        this.executeAttack(attacker, defender, type);
     }
 
     executeAttack(attacker, defender, type) {
@@ -549,14 +542,34 @@ class GameScene extends Phaser.Scene {
             if (type === 'kick') { defender.setTint(0xffaa00); this.cameras.main.shake(100, 0.005); }
             else { defender.setTint(0xff0000); }
             setTimeout(() => defender.clearTint(), 150);
+
+            // 👇 SYNC HEALTH TO THE OTHER PLAYER 👇
+            if (this.gameMode === 'online' && conn) {
+                conn.send({ 
+                    type: 'health', 
+                    p1Health: this.playerHealth, 
+                    p2Health: this.enemyHealth,
+                    attacker: isHost ? 'p1' : 'p2'
+                });
+            }
         }
     }
 
     doLocalSpecial() {
-        if (isHost || this.gameMode === 'ai') {
-            if (this.p1SpecialReady) this.useSpecial(this.p1Name, true);
-        } else {
-            if (this.p2SpecialReady) this.useSpecial(this.p2Name, false);
+        let attacker = isHost || this.gameMode === 'ai' ? this.player : this.enemy;
+        let characterName = isHost || this.gameMode === 'ai' ? this.p1Name : this.p2Name;
+        let isP1 = isHost || this.gameMode === 'ai';
+        
+        if (isP1 && this.p1SpecialReady) {
+            this.useSpecial(characterName, true);
+            if (this.gameMode === 'online' && conn) {
+                conn.send({ type: 'health', p1Health: this.playerHealth, p2Health: this.enemyHealth, attacker: 'p1' });
+            }
+        } else if (!isP1 && this.p2SpecialReady) {
+            this.useSpecial(characterName, false);
+            if (this.gameMode === 'online' && conn) {
+                conn.send({ type: 'health', p1Health: this.playerHealth, p2Health: this.enemyHealth, attacker: 'p2' });
+            }
         }
     }
 
@@ -583,7 +596,6 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    // (Keep all your animate functions exactly the same: animateLightning, animateHeal, animateFlash, animateSoundWaves, animateGoldShield, animateCodeRain, showFloatingText)
     animateLightning(attacker, target) { let lightning = this.add.graphics(); lightning.lineStyle(6, 0x00ffff, 1); lightning.beginPath(); lightning.moveTo(attacker.x, attacker.y - 50); let midX = (attacker.x + target.x) / 2; let midY = (attacker.y + target.y) / 2 - 100; lightning.lineTo(midX, midY + 50); lightning.lineTo(midX + 30, midY); lightning.lineTo(target.x, target.y - 50); lightning.strokePath(); this.tweens.add({ targets: lightning, alpha: 0, duration: 400, onComplete: () => lightning.destroy() }); }
     animateHeal(target) { let healCircle = this.add.circle(target.x, target.y, 50, 0x2ecc71, 0.5); this.tweens.add({ targets: healCircle, scale: 2, alpha: 0, duration: 800, onComplete: () => healCircle.destroy() }); for(let i=0; i<3; i++) { let plus = this.add.text(target.x + Phaser.Math.Between(-40, 40), target.y, "+", { fontSize: '40px', fill: '#2ecc71', fontStyle: 'bold' }).setOrigin(0.5); this.tweens.add({ targets: plus, y: target.y - 150, alpha: 0, duration: 1000, delay: i * 150, onComplete: () => plus.destroy() }); } }
     animateFlash(target) { let flash = this.add.circle(target.x, target.y, 20, 0xffffff, 1); this.tweens.add({ targets: flash, scale: 20, alpha: 0, duration: 600, ease: 'Expo.easeOut', onComplete: () => flash.destroy() }); target.setTint(0xffffff); setTimeout(() => target.clearTint(), 500); }
@@ -594,6 +606,8 @@ class GameScene extends Phaser.Scene {
 
     endGame(winner) {
         this.isGameOver = true; this.player.setVelocityX(0); this.enemy.setVelocityX(0);
+        if (this.syncTimer) this.syncTimer.remove(); // Stop network sync
+        
         try { if (this.fightMusic) this.fightMusic.stop(); } catch (e) {}
         try {
             if (!this.sound.mute) {
