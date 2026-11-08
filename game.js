@@ -1,11 +1,20 @@
 // ==========================================
-// GITHUB LEADERBOARD CONFIGURATION
+// FIREBASE INITIALIZATION
 // ==========================================
-const GITHUB_TOKEN = "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"; 
-const REPO_OWNER = "ALJE0123456789";
-const REPO_NAME = "CEC-FUN-GAME";
-const FILE_PATH = "leaderboard.json";
-const BRANCH = "main";
+const firebaseConfig = {
+    apiKey: "AIzaSyBpDuYfiZkzEakFX6sI53N9MYSW6iZClQg",
+    authDomain: "fightkaro-leaderboard.firebaseapp.com",
+    projectId: "fightkaro-leaderboard",
+    storageBucket: "fightkaro-leaderboard.firebasestorage.app",
+    messagingSenderId: "197264905391",
+    appId: "1:197264905391:web:3d86d64f6472476272305a"
+};
+
+// Initialize Firebase
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
 
 // ==========================================
 // GLOBAL NETWORK VARIABLES
@@ -317,7 +326,7 @@ class DifficultyScene extends Phaser.Scene {
 }
 
 // ==========================================
-// SCENE 5: LEADERBOARD (WITH TABS)
+// SCENE 5: LEADERBOARD (FIREBASE VERSION)
 // ==========================================
 class LeaderboardScene extends Phaser.Scene {
     constructor() { super('LeaderboardScene'); }
@@ -337,22 +346,10 @@ class LeaderboardScene extends Phaser.Scene {
         this.tableContainer = this.add.container(0, 0);
         this.loadingText = this.add.text(512, 288, 'Fetching Champions...', { fontSize: '24px', fill: '#fff' }).setOrigin(0.5);
 
-        const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${FILE_PATH}?t=${Date.now()}`;
+        this.drawTable('online');
         
-        fetch(rawUrl)
-            .then(response => response.json())
-            .then(data => {
-                this.loadingText.destroy();
-                this.dbData = data;
-                this.drawTable('online');
-                
-                this.onlineTab.on('pointerdown', () => { this.updateTabStyles('online'); this.drawTable('online'); });
-                this.aiTab.on('pointerdown', () => { this.updateTabStyles('ai'); this.drawTable('ai'); });
-            })
-            .catch(err => {
-                console.error(err);
-                this.loadingText.setText("⚠️ Failed to load leaderboard. Check console.");
-            });
+        this.onlineTab.on('pointerdown', () => { this.updateTabStyles('online'); this.drawTable('online'); });
+        this.aiTab.on('pointerdown', () => { this.updateTabStyles('ai'); this.drawTable('ai'); });
     }
 
     updateTabStyles(mode) {
@@ -366,45 +363,60 @@ class LeaderboardScene extends Phaser.Scene {
     }
 
     drawTable(mode) {
-        this.tableContainer.removeAll(true); 
-        let modeData = this.dbData[mode] || {};
-        let players = Object.keys(modeData).map(name => ({ name: name, wins: modeData[name] }));
-        players.sort((a, b) => b.wins - a.wins);
-
-        if (players.length === 0) {
-            let emptyText = this.add.text(512, 300, `No ${mode === 'online' ? 'Online' : 'AI'} fights recorded yet!`, { fontSize: '24px', fill: '#bdc3c7' }).setOrigin(0.5);
-            this.tableContainer.add(emptyText);
-            return;
-        }
-
-        let tableBg = this.add.rectangle(512, 360, 800, 380, 0x222222, 0.8).setStrokeStyle(4, mode === 'online' ? 0x3498db : 0xe67e22);
-        let headerRank = this.add.text(200, 190, 'RANK', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' });
-        let headerName = this.add.text(400, 190, 'FIGHTER', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' });
-        let headerWins = this.add.text(750, 190, 'WINS', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(1, 0);
+        this.tableContainer.removeAll(true);
         
-        this.tableContainer.add([tableBg, headerRank, headerName, headerWins]);
+        let collectionName = (mode === 'online') ? 'leaderboard_online' : 'leaderboard_ai';
+        if (this.loadingText.active) this.loadingText.setText('Fetching Champions...');
 
-        players.slice(0, 7).forEach((player, index) => {
-            let yPos = 250 + (index * 45);
-            let color = '#fff';
-            let rankIcon = `#${index + 1}`;
-            if (index === 0) { color = '#f1c40f'; rankIcon = '🥇'; }
-            else if (index === 1) { color = '#bdc3c7'; rankIcon = '🥈'; }
-            else if (index === 2) { color = '#cd7f32'; rankIcon = '🥉'; }
+        // FETCH FROM FIRESTORE
+        db.collection(collectionName).orderBy("wins", "desc").limit(10).get()
+            .then((querySnapshot) => {
+                if (this.loadingText.active) this.loadingText.destroy();
+                this.tableContainer.removeAll(true);
 
-            let displayName = (player.name === 'aadhiljunise') ? 'AADHIL JUNISE' : player.name.toUpperCase();
-            
-            if (index % 2 === 0) {
-                let rowBg = this.add.rectangle(512, yPos, 760, 40, 0xffffff, 0.05).setOrigin(0.5);
-                this.tableContainer.add(rowBg);
-            }
+                let players = [];
+                querySnapshot.forEach((doc) => {
+                    players.push({ name: doc.id, wins: doc.data().wins });
+                });
 
-            let rankText = this.add.text(220, yPos, rankIcon, { fontSize: '24px', fill: color, fontStyle: 'bold' }).setOrigin(0.5);
-            let nameText = this.add.text(320, yPos, displayName, { fontSize: '24px', fill: color }).setOrigin(0, 0.5);
-            let winsText = this.add.text(750, yPos, `${player.wins} WINS`, { fontSize: '24px', fill: color, fontStyle: 'bold' }).setOrigin(1, 0.5);
-            
-            this.tableContainer.add([rankText, nameText, winsText]);
-        });
+                if (players.length === 0) {
+                    let emptyText = this.add.text(512, 300, `No ${mode === 'online' ? 'Online' : 'AI'} fights recorded yet!`, { fontSize: '24px', fill: '#bdc3c7' }).setOrigin(0.5);
+                    this.tableContainer.add(emptyText);
+                    return;
+                }
+
+                let tableBg = this.add.rectangle(512, 360, 800, 380, 0x222222, 0.8).setStrokeStyle(4, mode === 'online' ? 0x3498db : 0xe67e22);
+                let headerRank = this.add.text(200, 190, 'RANK', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' });
+                let headerName = this.add.text(400, 190, 'FIGHTER', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' });
+                let headerWins = this.add.text(750, 190, 'WINS', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(1, 0);
+                this.tableContainer.add([tableBg, headerRank, headerName, headerWins]);
+
+                players.forEach((player, index) => {
+                    let yPos = 250 + (index * 45);
+                    let color = '#fff';
+                    let rankIcon = `#${index + 1}`;
+                    if (index === 0) { color = '#f1c40f'; rankIcon = '🥇'; }
+                    else if (index === 1) { color = '#bdc3c7'; rankIcon = '🥈'; }
+                    else if (index === 2) { color = '#cd7f32'; rankIcon = '🥉'; }
+
+                    let displayName = (player.name === 'aadhiljunise') ? 'AADHIL JUNISE' : player.name.toUpperCase();
+                    
+                    if (index % 2 === 0) {
+                        let rowBg = this.add.rectangle(512, yPos, 760, 40, 0xffffff, 0.05).setOrigin(0.5);
+                        this.tableContainer.add(rowBg);
+                    }
+
+                    let rankText = this.add.text(220, yPos, rankIcon, { fontSize: '24px', fill: color, fontStyle: 'bold' }).setOrigin(0.5);
+                    let nameText = this.add.text(320, yPos, displayName, { fontSize: '24px', fill: color }).setOrigin(0, 0.5);
+                    let winsText = this.add.text(750, yPos, `${player.wins} WINS`, { fontSize: '24px', fill: color, fontStyle: 'bold' }).setOrigin(1, 0.5);
+                    
+                    this.tableContainer.add([rankText, nameText, winsText]);
+                });
+            })
+            .catch((error) => {
+                console.error("Error fetching leaderboard: ", error);
+                if (this.loadingText.active) this.loadingText.setText("⚠️ Failed to load leaderboard.");
+            });
     }
 }
 
@@ -712,40 +724,22 @@ class GameScene extends Phaser.Scene {
         if (this.syncTimer) this.syncTimer.remove(); 
         
         // ==========================================
-        // SAVE WIN TO GITHUB
+        // SAVE WIN TO FIREBASE
         // ==========================================
         let winnerName = (winner === 'PLAYER') ? this.p1Name : this.p2Name;
         let modeKey = (this.gameMode === 'online') ? 'online' : 'ai';
+        let collectionName = (modeKey === 'online') ? 'leaderboard_online' : 'leaderboard_ai';
         
-        const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
-        
-        fetch(apiUrl, { headers: { Authorization: `token ${GITHUB_TOKEN}` } })
-            .then(res => res.json())
-            .then(fileData => {
-                let cleanContent = fileData.content.replace(/\n/g, ''); 
-                let currentData = JSON.parse(atob(cleanContent));
-                
-                if (!currentData.online) currentData.online = {};
-                if (!currentData.ai) currentData.ai = {};
-                
-                currentData[modeKey][winnerName] = (currentData[modeKey][winnerName] || 0) + 1;
-                
-                let newContent = btoa(JSON.stringify(currentData, null, 2));
-
-                return fetch(apiUrl, {
-                    method: 'PUT',
-                    headers: { Authorization: `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: `🏆 ${winnerName} won a ${modeKey} match!`,
-                        content: newContent,
-                        sha: fileData.sha,
-                        branch: BRANCH
-                    })
-                });
-            })
-            .then(res => res.json())
-            .then(data => console.log("Leaderboard Updated on GitHub!", data))
-            .catch(err => console.error("GitHub Save Failed:", err));
+        // Use .set with merge: true to create the doc if it doesn't exist, or update it if it does
+        db.collection(collectionName).doc(winnerName).set({
+            wins: firebase.firestore.FieldValue.increment(1)
+        }, { merge: true })
+        .then(() => {
+            console.log(`✅ ${winnerName}'s win in ${modeKey} saved to Firebase!`);
+        })
+        .catch((error) => {
+            console.error("❌ Error saving win to Firebase: ", error);
+        });
 
         // ==========================================
 
