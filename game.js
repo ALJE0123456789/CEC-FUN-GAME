@@ -1,7 +1,7 @@
 // ==========================================
 // GITHUB LEADERBOARD CONFIGURATION
 // ==========================================
-const GITHUB_TOKEN = "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"; 
+const GITHUB_TOKEN = "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"; 
 const REPO_OWNER = "ALJE0123456789";
 const REPO_NAME = "CEC-FUN-GAME";
 const FILE_PATH = "leaderboard.json";
@@ -317,7 +317,7 @@ class DifficultyScene extends Phaser.Scene {
 }
 
 // ==========================================
-// SCENE 5: LEADERBOARD (NEW)
+// SCENE 5: LEADERBOARD (WITH TABS)
 // ==========================================
 class LeaderboardScene extends Phaser.Scene {
     constructor() { super('LeaderboardScene'); }
