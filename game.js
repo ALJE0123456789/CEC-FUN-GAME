@@ -1,7 +1,7 @@
 // ==========================================
 // GITHUB LEADERBOARD CONFIGURATION
 // ==========================================
-const GITHUB_TOKEN = "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"; 
+const GITHUB_TOKEN = "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"; 
 const REPO_OWNER = "ALJE0123456789";
 const REPO_NAME = "CEC-FUN-GAME";
 const FILE_PATH = "leaderboard.json";
