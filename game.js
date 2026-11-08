@@ -1,11 +1,19 @@
 // ==========================================
+// GITHUB LEADERBOARD CONFIGURATION
+// ==========================================
+const GITHUB_TOKEN = "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"; 
+const REPO_OWNER = "ALJE0123456789";
+const REPO_NAME = "CEC-FUN-GAME";
+const FILE_PATH = "leaderboard.json";
+const BRANCH = "main";
+
+// ==========================================
 // GLOBAL NETWORK VARIABLES
 // ==========================================
 let peer = null;
 let conn = null;
 let isHost = false;
 let roomCode = "";
-let networkData = { x: 0, y: 0, flipX: false, action: "" };
 
 // ==========================================
 // SCENE 0: BOOT
@@ -53,8 +61,8 @@ class MainMenu extends Phaser.Scene {
         this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
         this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.7); 
         
-        this.add.text(512, 100, 'FIGHT KARO', { fontSize: '80px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
-        this.add.text(512, 170, 'COLLEGE EDITION', { fontSize: '32px', fill: '#ecf0f1' }).setOrigin(0.5);
+        this.add.text(512, 80, 'FIGHT KARO', { fontSize: '70px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
+        this.add.text(512, 140, 'COLLEGE EDITION', { fontSize: '30px', fill: '#ecf0f1' }).setOrigin(0.5);
 
         // MUTE BUTTON
         let isMuted = this.sound.mute;
@@ -65,16 +73,22 @@ class MainMenu extends Phaser.Scene {
         });
 
         // PLAY WITH COMPUTER BUTTON
-        let playAI = this.add.text(512, 350, 'PLAY WITH COMPUTER', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 40, y: 20 } }).setOrigin(0.5).setInteractive();
+        let playAI = this.add.text(512, 250, 'PLAY WITH COMPUTER', { fontSize: '28px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 40, y: 20 } }).setOrigin(0.5).setInteractive();
         playAI.on('pointerdown', () => { isHost = false; this.scene.start('CharSelectScene', { mode: 'ai' }); });
         playAI.on('pointerover', () => playAI.setStyle({ backgroundColor: '#27ae60' }));
         playAI.on('pointerout', () => playAI.setStyle({ backgroundColor: '#2ecc71' }));
 
         // PLAY ONLINE BUTTON
-        let playOnline = this.add.text(512, 450, 'PLAY ONLINE (PVP)', { fontSize: '32px', fill: '#fff', backgroundColor: '#3498db', padding: { x: 40, y: 20 } }).setOrigin(0.5).setInteractive();
+        let playOnline = this.add.text(512, 350, 'PLAY ONLINE (PVP)', { fontSize: '28px', fill: '#fff', backgroundColor: '#3498db', padding: { x: 40, y: 20 } }).setOrigin(0.5).setInteractive();
         playOnline.on('pointerdown', () => { this.scene.start('LobbyScene'); });
         playOnline.on('pointerover', () => playOnline.setStyle({ backgroundColor: '#2980b9' }));
         playOnline.on('pointerout', () => playOnline.setStyle({ backgroundColor: '#3498db' }));
+
+        // LEADERBOARD BUTTON
+        let leaderboardBtn = this.add.text(512, 470, '🏆 HALL OF FAME', { fontSize: '24px', fill: '#f1c40f', backgroundColor: '#333', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
+        leaderboardBtn.on('pointerdown', () => { this.scene.start('LeaderboardScene'); });
+        leaderboardBtn.on('pointerover', () => leaderboardBtn.setStyle({ backgroundColor: '#555' }));
+        leaderboardBtn.on('pointerout', () => leaderboardBtn.setStyle({ backgroundColor: '#333' }));
     }
 }
 
@@ -90,26 +104,18 @@ class LobbyScene extends Phaser.Scene {
         
         this.add.text(512, 80, 'ONLINE MULTIPLAYER', { fontSize: '50px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
 
-        // BACK BUTTON
         let backBtn = this.add.text(100, 50, '⬅ BACK', { fontSize: '20px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } }).setOrigin(0.5).setInteractive();
         backBtn.on('pointerdown', () => { this.scene.start('MainMenu'); });
 
-        // HOST BUTTON
         let hostBtn = this.add.text(512, 250, 'HOST A GAME', { fontSize: '30px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
         hostBtn.on('pointerdown', () => this.hostGame());
 
-        // JOIN SECTION
         this.add.text(512, 350, 'OR JOIN A FRIEND', { fontSize: '24px', fill: '#bdc3c7' }).setOrigin(0.5);
 
-        // 👇 REPLACED THE HTML INPUT WITH A SIMPLE PROMPT BUTTON 👇
         let joinBtn = this.add.text(512, 430, 'JOIN GAME', { fontSize: '30px', fill: '#fff', backgroundColor: '#3498db', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
-        
         joinBtn.on('pointerdown', () => {
-            // This will pop up a native keyboard/alert box for them to type the code!
             let code = prompt("Enter the Room Code from your friend (e.g., FIGHT-X7Y2B):");
-            if (code) {
-                this.joinGame(code.trim().toUpperCase());
-            }
+            if (code) this.joinGame(code.trim().toUpperCase());
         });
 
         this.statusText = this.add.text(512, 520, '', { fontSize: '20px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
@@ -118,7 +124,6 @@ class LobbyScene extends Phaser.Scene {
     hostGame() {
         this.statusText.setText("Generating Room Code...");
         roomCode = "FIGHT-" + Math.random().toString(36).substring(2, 7).toUpperCase();
-        
         peer = new Peer(roomCode);
         isHost = true;
 
@@ -129,9 +134,7 @@ class LobbyScene extends Phaser.Scene {
         peer.on('connection', (connection) => {
             conn = connection;
             this.statusText.setText("Friend Connected! Starting...");
-            setTimeout(() => {
-                this.scene.start('CharSelectScene', { mode: 'online' });
-            }, 1000);
+            setTimeout(() => { this.scene.start('CharSelectScene', { mode: 'online' }); }, 1000);
         });
     }
 
@@ -141,17 +144,11 @@ class LobbyScene extends Phaser.Scene {
         isHost = false;
 
         peer.on('open', () => {
-            // Connect to the host's room code
             conn = peer.connect(code);
-            
             conn.on('open', () => {
                 this.statusText.setText("Connected to Host!");
-                setTimeout(() => {
-                    this.scene.start('CharSelectScene', { mode: 'online' });
-                }, 500);
+                setTimeout(() => { this.scene.start('CharSelectScene', { mode: 'online' }); }, 500);
             });
-
-            // Catch connection errors (like wrong code)
             peer.on('error', (err) => {
                 console.log(err);
                 this.statusText.setText("Failed to connect. Check code and try again.");
@@ -167,12 +164,10 @@ class CharSelectScene extends Phaser.Scene {
     constructor() { super('CharSelectScene'); }
 
     init(data) {
-        this.gameMode = data.mode || 'ai'; // 'ai' or 'online'
+        this.gameMode = data.mode || 'ai'; 
         this.p1Char = null;
         this.p2Char = null;
         this.matchStarted = false;
-        
-        // AI Mode logic
         this.activePlayer = 1;
     }
 
@@ -185,7 +180,6 @@ class CharSelectScene extends Phaser.Scene {
         this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
         this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.6); 
 
-        // DISMISS GAME BUTTON
         let dismissBtn = this.add.text(100, 50, '⬅ DISMISS', { fontSize: '20px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } }).setOrigin(0.5).setInteractive();
         dismissBtn.on('pointerdown', () => {
             if (conn) { conn.close(); peer.destroy(); conn = null; peer = null; }
@@ -209,9 +203,7 @@ class CharSelectScene extends Phaser.Scene {
             this.sprites.push({ name: char, sprite: sprite });
             
             sprite.setInteractive();
-            sprite.on('pointerdown', () => {
-                this.handleSelection(char, sprite);
-            });
+            sprite.on('pointerdown', () => { this.handleSelection(char, sprite); });
             
             let displayName = (char === 'aadhiljunise') ? 'AADHIL JUNISE' : char.toUpperCase();
             this.add.text(x, y + 120, displayName, { fontSize: '16px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
@@ -219,23 +211,16 @@ class CharSelectScene extends Phaser.Scene {
 
         this.startBtn = this.add.text(512, 520, 'CONTINUE', { fontSize: '32px', fill: '#2ecc71', fontStyle: 'bold', backgroundColor: '#000', padding: { x: 20, y: 10 } }).setOrigin(0.5).setVisible(false);
 
-        // AI MODE START BUTTON
         this.startBtn.setInteractive();
         this.startBtn.on('pointerdown', () => {
             this.scene.start('DifficultyScene', { p1: this.p1Char, p2: this.p2Char });
         });
 
-        // NETWORK LISTENER
         if (this.gameMode === 'online' && conn) {
             conn.on('data', (data) => {
                 if (data.type === 'pick') {
-                    if (data.role === 'p1') {
-                        this.p1Char = data.char;
-                        this.updateUI();
-                    } else if (data.role === 'p2') {
-                        this.p2Char = data.char;
-                        this.updateUI();
-                    }
+                    if (data.role === 'p1') { this.p1Char = data.char; this.updateUI(); } 
+                    else if (data.role === 'p2') { this.p2Char = data.char; this.updateUI(); }
                     this.checkStartMatch();
                 }
                 if (data.type === 'start_match' && !isHost) {
@@ -248,12 +233,10 @@ class CharSelectScene extends Phaser.Scene {
     handleSelection(char, sprite) {
         if (this.gameMode === 'online') {
             if (isHost) {
-                // HOST PICKS PLAYER 1
                 this.p1Char = char;
                 this.updateUI();
                 if (conn) conn.send({ type: 'pick', role: 'p1', char: char });
             } else {
-                // GUEST PICKS PLAYER 2 (Cannot pick P1's character)
                 if (char === this.p1Char) return; 
                 this.p2Char = char;
                 this.updateUI();
@@ -261,16 +244,9 @@ class CharSelectScene extends Phaser.Scene {
             }
             this.checkStartMatch();
         } else {
-            // AI MODE LOGIC (Alternating picks)
             if (this.activePlayer === 2 && char === this.p1Char) return; 
-
-            if (this.activePlayer === 1) {
-                this.p1Char = char;
-                this.activePlayer = 2;
-            } else {
-                this.p2Char = char;
-                this.activePlayer = 1; 
-            }
+            if (this.activePlayer === 1) { this.p1Char = char; this.activePlayer = 2; } 
+            else { this.p2Char = char; this.activePlayer = 1; }
             this.updateUI();
             if (this.p1Char && this.p2Char) this.startBtn.setVisible(true);
         }
@@ -278,7 +254,6 @@ class CharSelectScene extends Phaser.Scene {
 
     updateUI() {
         this.sprites.forEach(s => s.sprite.clearTint());
-        
         if (this.p1Char) {
             let p1Sprite = this.sprites.find(s => s.name === this.p1Char);
             if (p1Sprite) p1Sprite.sprite.setTint(0x3498db);
@@ -286,7 +261,6 @@ class CharSelectScene extends Phaser.Scene {
             this.p1Text.setText(`P1: ${dName}`);
             this.p1Text.setColor('#3498db');
         }
-
         if (this.p2Char) {
             let p2Sprite = this.sprites.find(s => s.name === this.p2Char);
             if (p2Sprite) p2Sprite.sprite.setTint(0xe74c3c);
@@ -297,7 +271,6 @@ class CharSelectScene extends Phaser.Scene {
     }
 
     checkStartMatch() {
-        // If both are picked in online mode, START AUTOMATICALLY
         if (this.gameMode === 'online' && this.p1Char && this.p2Char && !this.matchStarted) {
             if (isHost) {
                 this.matchStarted = true;
@@ -307,6 +280,7 @@ class CharSelectScene extends Phaser.Scene {
         }
     }
 }
+
 // ==========================================
 // SCENE 4: DIFFICULTY SELECTION
 // ==========================================
@@ -343,7 +317,99 @@ class DifficultyScene extends Phaser.Scene {
 }
 
 // ==========================================
-// SCENE 5: GAME
+// SCENE 5: LEADERBOARD (NEW)
+// ==========================================
+class LeaderboardScene extends Phaser.Scene {
+    constructor() { super('LeaderboardScene'); }
+
+    create() {
+        this.add.image(512, 288, 'background').setDisplaySize(1024, 576);
+        this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.85);
+
+        this.add.text(512, 60, '🏆 HALL OF FAME 🏆', { fontSize: '50px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
+
+        let backBtn = this.add.text(100, 50, '⬅ BACK', { fontSize: '20px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 15, y: 10 } }).setOrigin(0.5).setInteractive();
+        backBtn.on('pointerdown', () => { this.scene.start('MainMenu'); });
+
+        this.onlineTab = this.add.text(380, 130, '🌐 ONLINE PVP', { fontSize: '24px', fill: '#fff', backgroundColor: '#3498db', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
+        this.aiTab = this.add.text(644, 130, '🤖 VS COMPUTER', { fontSize: '24px', fill: '#fff', backgroundColor: '#7f8c8d', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive();
+
+        this.tableContainer = this.add.container(0, 0);
+        this.loadingText = this.add.text(512, 288, 'Fetching Champions...', { fontSize: '24px', fill: '#fff' }).setOrigin(0.5);
+
+        const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${FILE_PATH}?t=${Date.now()}`;
+        
+        fetch(rawUrl)
+            .then(response => response.json())
+            .then(data => {
+                this.loadingText.destroy();
+                this.dbData = data;
+                this.drawTable('online');
+                
+                this.onlineTab.on('pointerdown', () => { this.updateTabStyles('online'); this.drawTable('online'); });
+                this.aiTab.on('pointerdown', () => { this.updateTabStyles('ai'); this.drawTable('ai'); });
+            })
+            .catch(err => {
+                console.error(err);
+                this.loadingText.setText("⚠️ Failed to load leaderboard. Check console.");
+            });
+    }
+
+    updateTabStyles(mode) {
+        if (mode === 'online') {
+            this.onlineTab.setStyle({ backgroundColor: '#3498db' });
+            this.aiTab.setStyle({ backgroundColor: '#7f8c8d' });
+        } else {
+            this.onlineTab.setStyle({ backgroundColor: '#7f8c8d' });
+            this.aiTab.setStyle({ backgroundColor: '#e67e22' });
+        }
+    }
+
+    drawTable(mode) {
+        this.tableContainer.removeAll(true); 
+        let modeData = this.dbData[mode] || {};
+        let players = Object.keys(modeData).map(name => ({ name: name, wins: modeData[name] }));
+        players.sort((a, b) => b.wins - a.wins);
+
+        if (players.length === 0) {
+            let emptyText = this.add.text(512, 300, `No ${mode === 'online' ? 'Online' : 'AI'} fights recorded yet!`, { fontSize: '24px', fill: '#bdc3c7' }).setOrigin(0.5);
+            this.tableContainer.add(emptyText);
+            return;
+        }
+
+        let tableBg = this.add.rectangle(512, 360, 800, 380, 0x222222, 0.8).setStrokeStyle(4, mode === 'online' ? 0x3498db : 0xe67e22);
+        let headerRank = this.add.text(200, 190, 'RANK', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' });
+        let headerName = this.add.text(400, 190, 'FIGHTER', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' });
+        let headerWins = this.add.text(750, 190, 'WINS', { fontSize: '22px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(1, 0);
+        
+        this.tableContainer.add([tableBg, headerRank, headerName, headerWins]);
+
+        players.slice(0, 7).forEach((player, index) => {
+            let yPos = 250 + (index * 45);
+            let color = '#fff';
+            let rankIcon = `#${index + 1}`;
+            if (index === 0) { color = '#f1c40f'; rankIcon = '🥇'; }
+            else if (index === 1) { color = '#bdc3c7'; rankIcon = '🥈'; }
+            else if (index === 2) { color = '#cd7f32'; rankIcon = '🥉'; }
+
+            let displayName = (player.name === 'aadhiljunise') ? 'AADHIL JUNISE' : player.name.toUpperCase();
+            
+            if (index % 2 === 0) {
+                let rowBg = this.add.rectangle(512, yPos, 760, 40, 0xffffff, 0.05).setOrigin(0.5);
+                this.tableContainer.add(rowBg);
+            }
+
+            let rankText = this.add.text(220, yPos, rankIcon, { fontSize: '24px', fill: color, fontStyle: 'bold' }).setOrigin(0.5);
+            let nameText = this.add.text(320, yPos, displayName, { fontSize: '24px', fill: color }).setOrigin(0, 0.5);
+            let winsText = this.add.text(750, yPos, `${player.wins} WINS`, { fontSize: '24px', fill: color, fontStyle: 'bold' }).setOrigin(1, 0.5);
+            
+            this.tableContainer.add([rankText, nameText, winsText]);
+        });
+    }
+}
+
+// ==========================================
+// SCENE 6: GAME
 // ==========================================
 class GameScene extends Phaser.Scene {
     constructor() { super('GameScene'); }
@@ -353,7 +419,7 @@ class GameScene extends Phaser.Scene {
         this.p2Name = data.p2 || 'muthalib';
         this.difficulty = data.diff || 'Normal';
         this.gameMode = data.mode || 'ai'; 
-        this.isPaused = false; // NEW: Pause state
+        this.isPaused = false; 
     }
 
     create() {
@@ -392,38 +458,30 @@ class GameScene extends Phaser.Scene {
         
         this.add.text(512, 30, `MODE: ${this.gameMode === 'online' ? 'ONLINE PVP' : this.difficulty.toUpperCase()}`, { fontSize: '20px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
 
-        // ==========================================
-        // NEW: PAUSE MENU UI
-        // ==========================================
-        // Pause Button (Top Right)
-                // Pause Button (Middle, under MODE text, between health bars)
+        // PAUSE UI
         this.pauseBtn = this.add.text(512, 75, '⏸️ PAUSE', { fontSize: '18px', fill: '#fff', backgroundColor: '#e67e22', padding: { x: 15, y: 5 } })
             .setOrigin(0.5).setInteractive().setDepth(500);
         this.pauseBtn.on('pointerdown', () => this.togglePause());
-        // Pause Overlay Container (Hidden initially)
-        this.pauseMenu = this.add.container(0, 0).setVisible(false).setDepth(1000);
         
+        this.pauseMenu = this.add.container(0, 0).setVisible(false).setDepth(1000);
         let pauseBg = this.add.rectangle(512, 288, 1024, 576, 0x000000, 0.85);
         let pauseTitle = this.add.text(512, 150, 'PAUSED', { fontSize: '64px', fill: '#f1c40f', fontStyle: 'bold' }).setOrigin(0.5);
         
-        // Resume Button
         let resumeBtn = this.add.text(512, 300, 'RESUME', { fontSize: '32px', fill: '#fff', backgroundColor: '#2ecc71', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
         resumeBtn.on('pointerdown', () => this.togglePause());
 
-        // Mute Button
         this.pauseMuteBtn = this.add.text(512, 400, this.sound.mute ? '🔇 SOUND OFF' : '🔊 SOUND ON', { fontSize: '32px', fill: '#fff', backgroundColor: '#34495e', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
         this.pauseMuteBtn.on('pointerdown', () => {
             this.sound.mute = !this.sound.mute;
             this.pauseMuteBtn.setText(this.sound.mute ? '🔇 SOUND OFF' : '🔊 SOUND ON');
         });
 
-        // Leave Button
         let leaveBtn = this.add.text(512, 500, 'LEAVE GAME', { fontSize: '32px', fill: '#fff', backgroundColor: '#e74c3c', padding: { x: 30, y: 15 } }).setOrigin(0.5).setInteractive();
         leaveBtn.on('pointerdown', () => this.leaveGame());
 
         this.pauseMenu.add([pauseBg, pauseTitle, resumeBtn, this.pauseMuteBtn, leaveBtn]);
-        // ==========================================
 
+        // CONTROLS
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
         this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
@@ -439,12 +497,12 @@ class GameScene extends Phaser.Scene {
         this.createTouchButton(700, 480, 'KICK', 0x3498db, () => this.doLocalAttack('kick'), () => {});
         this.createTouchButton(550, 480, 'SPECIAL', 0xf1c40f, () => this.doLocalSpecial(), () => {});
 
-        // 👇 NEW NETWORK SYNC LOGIC 👇
+        // NETWORK SYNC
         if (this.gameMode === 'online' && conn) {
-            // 1. SYNC MOVEMENT EVERY 30MS (Fixes smoothness)
             this.syncTimer = this.time.addEvent({
                 delay: 30, 
                 callback: () => {
+                    if (this.isPaused || this.isGameOver) return;
                     conn.send({
                         type: 'move',
                         x: isHost ? this.player.x : this.enemy.x,
@@ -455,35 +513,19 @@ class GameScene extends Phaser.Scene {
                 loop: true
             });
 
-            // 2. LISTEN FOR NETWORK EVENTS
             conn.on('data', (data) => {
-                if (this.isPaused || this.isGameOver) return; // Ignore network updates if paused
-
+                if (this.isPaused || this.isGameOver) return; 
                 if (data.type === 'move') {
-                    if (isHost) {
-                        this.enemy.x = data.x;
-                        this.enemy.y = data.y;
-                        this.enemy.setFlipX(data.flipX);
-                    } else {
-                        this.player.x = data.x;
-                        this.player.y = data.y;
-                        this.player.setFlipX(data.flipX);
-                    }
+                    if (isHost) { this.enemy.x = data.x; this.enemy.y = data.y; this.enemy.setFlipX(data.flipX); } 
+                    else { this.player.x = data.x; this.player.y = data.y; this.player.setFlipX(data.flipX); }
                 } else if (data.type === 'health') {
                     this.playerHealth = data.p1Health;
                     this.enemyHealth = data.p2Health;
-                    
-                    if (data.attacker === 'p1') {
-                        this.enemy.setTint(0xff0000);
-                        setTimeout(() => this.enemy.clearTint(), 150);
-                    } else {
-                        this.player.setTint(0xff0000);
-                        setTimeout(() => this.player.clearTint(), 150);
-                    }
+                    if (data.attacker === 'p1') { this.enemy.setTint(0xff0000); setTimeout(() => this.enemy.clearTint(), 150); } 
+                    else { this.player.setTint(0xff0000); setTimeout(() => this.player.clearTint(), 150); }
                 }
             });
 
-            // 3. NEW: HANDLE OPPONENT LEAVING
             conn.on('close', () => {
                 if (!this.isGameOver) {
                     this.isGameOver = true;
@@ -498,10 +540,9 @@ class GameScene extends Phaser.Scene {
 
     togglePause() {
         this.isPaused = !this.isPaused;
-        
         if (this.isPaused) {
             this.physics.pause();
-            if (this.syncTimer) this.syncTimer.paused = true; // Stop sending network data
+            if (this.syncTimer) this.syncTimer.paused = true; 
             this.pauseMenu.setVisible(true);
             this.pauseBtn.setVisible(false);
         } else {
@@ -515,26 +556,18 @@ class GameScene extends Phaser.Scene {
     leaveGame() {
         this.isGameOver = true;
         if (this.fightMusic) this.fightMusic.stop();
-        
-        // Clean up audio
         this.sound.stopByKey('sfx_win'); 
         this.sound.stopByKey('sfx_lose');
 
-        // Clean up Network
         if (this.gameMode === 'online' && conn) { 
-            conn.close(); 
-            peer.destroy(); 
-            conn = null; 
-            peer = null; 
+            conn.close(); peer.destroy(); conn = null; peer = null; 
         }
 
-        // Play Menu Music
         if (this.cache.audio.exists('bgm_menu')) {
             let menuMusic = this.sound.get('bgm_menu');
             if (!menuMusic) menuMusic = this.sound.add('bgm_menu', { loop: true, volume: 0.5 });
             if (!menuMusic.isPlaying) menuMusic.play();
         }
-        
         this.scene.start('MainMenu');
     }
 
@@ -546,10 +579,8 @@ class GameScene extends Phaser.Scene {
     }
 
     update() {
-        // NEW: Stop the game loop if paused or game over
         if (this.isGameOver || this.isPaused) return;
 
-        // HOST CONTROLS PLAYER 1
         if (this.gameMode === 'ai' || (this.gameMode === 'online' && isHost)) {
             if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) { this.player.setVelocityX(-250); } 
             else if (this.cursors.right.isDown || this.keyD.isDown || this.btnRightPressed) { this.player.setVelocityX(250); } 
@@ -563,7 +594,6 @@ class GameScene extends Phaser.Scene {
             if (Phaser.Input.Keyboard.JustDown(this.kickKey)) this.doLocalAttack('kick');
             if (Phaser.Input.Keyboard.JustDown(this.specialKey)) this.doLocalSpecial();
         } 
-        // GUEST CONTROLS PLAYER 2
         else if (this.gameMode === 'online' && !isHost) {
             if (this.cursors.left.isDown || this.keyA.isDown || this.btnLeftPressed) { this.enemy.setVelocityX(-250); } 
             else if (this.cursors.right.isDown || this.keyD.isDown || this.btnRightPressed) { this.enemy.setVelocityX(250); } 
@@ -578,7 +608,6 @@ class GameScene extends Phaser.Scene {
             if (Phaser.Input.Keyboard.JustDown(this.specialKey)) this.doLocalSpecial();
         }
 
-        // AI LOGIC (Only in AI mode)
         if (this.gameMode === 'ai') {
             let enemySpeed = 150; let attackChance = 0.02; let specialChance = 0.01;
             if (this.difficulty === 'Easy') { enemySpeed = 80; attackChance = 0.008; specialChance = 0.003; } 
@@ -594,11 +623,9 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        // Update Health Bars
         this.playerHealthBar.width = (Math.max(0, this.playerHealth) / 100) * 300;
         this.enemyHealthBar.width = (Math.max(0, this.enemyHealth) / 100) * 300;
 
-        // Check Win/Lose
         if (this.enemyHealth <= 0 && !this.isGameOver) this.endGame('PLAYER');
         if (this.playerHealth <= 0 && !this.isGameOver) this.endGame('ENEMY');
     }
@@ -613,7 +640,6 @@ class GameScene extends Phaser.Scene {
 
         let attacker = isHost || this.gameMode === 'ai' ? this.player : this.enemy;
         let defender = isHost || this.gameMode === 'ai' ? this.enemy : this.player;
-
         this.executeAttack(attacker, defender, type);
     }
 
@@ -628,35 +654,24 @@ class GameScene extends Phaser.Scene {
             else { defender.setTint(0xff0000); }
             setTimeout(() => defender.clearTint(), 150);
 
-            // SYNC HEALTH TO THE OTHER PLAYER
             if (this.gameMode === 'online' && conn) {
-                conn.send({ 
-                    type: 'health', 
-                    p1Health: this.playerHealth, 
-                    p2Health: this.enemyHealth,
-                    attacker: isHost ? 'p1' : 'p2'
-                });
+                conn.send({ type: 'health', p1Health: this.playerHealth, p2Health: this.enemyHealth, attacker: isHost ? 'p1' : 'p2' });
             }
         }
     }
 
     doLocalSpecial() {
         if (this.isPaused) return;
-        
         let attacker = isHost || this.gameMode === 'ai' ? this.player : this.enemy;
         let characterName = isHost || this.gameMode === 'ai' ? this.p1Name : this.p2Name;
         let isP1 = isHost || this.gameMode === 'ai';
         
         if (isP1 && this.p1SpecialReady) {
             this.useSpecial(characterName, true);
-            if (this.gameMode === 'online' && conn) {
-                conn.send({ type: 'health', p1Health: this.playerHealth, p2Health: this.enemyHealth, attacker: 'p1' });
-            }
+            if (this.gameMode === 'online' && conn) conn.send({ type: 'health', p1Health: this.playerHealth, p2Health: this.enemyHealth, attacker: 'p1' });
         } else if (!isP1 && this.p2SpecialReady) {
             this.useSpecial(characterName, false);
-            if (this.gameMode === 'online' && conn) {
-                conn.send({ type: 'health', p1Health: this.playerHealth, p2Health: this.enemyHealth, attacker: 'p2' });
-            }
+            if (this.gameMode === 'online' && conn) conn.send({ type: 'health', p1Health: this.playerHealth, p2Health: this.enemyHealth, attacker: 'p2' });
         }
     }
 
@@ -692,9 +707,48 @@ class GameScene extends Phaser.Scene {
     showFloatingText(text, sprite) { let txt = this.add.text(sprite.x, sprite.y - 100, text, { fontSize: '36px', fill: '#f1c40f', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5); this.tweens.add({ targets: txt, y: sprite.y - 200, alpha: 0, duration: 1200, onComplete: () => txt.destroy() }); }
 
     endGame(winner) {
-        this.isGameOver = true; this.player.setVelocityX(0); this.enemy.setVelocityX(0);
-        if (this.syncTimer) this.syncTimer.remove(); // Stop network sync
+        this.isGameOver = true; 
+        this.player.setVelocityX(0); this.enemy.setVelocityX(0);
+        if (this.syncTimer) this.syncTimer.remove(); 
         
+        // ==========================================
+        // SAVE WIN TO GITHUB
+        // ==========================================
+        let winnerName = (winner === 'PLAYER') ? this.p1Name : this.p2Name;
+        let modeKey = (this.gameMode === 'online') ? 'online' : 'ai';
+        
+        const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
+        
+        fetch(apiUrl, { headers: { Authorization: `token ${GITHUB_TOKEN}` } })
+            .then(res => res.json())
+            .then(fileData => {
+                let cleanContent = fileData.content.replace(/\n/g, ''); 
+                let currentData = JSON.parse(atob(cleanContent));
+                
+                if (!currentData.online) currentData.online = {};
+                if (!currentData.ai) currentData.ai = {};
+                
+                currentData[modeKey][winnerName] = (currentData[modeKey][winnerName] || 0) + 1;
+                
+                let newContent = btoa(JSON.stringify(currentData, null, 2));
+
+                return fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: { Authorization: `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: `🏆 ${winnerName} won a ${modeKey} match!`,
+                        content: newContent,
+                        sha: fileData.sha,
+                        branch: BRANCH
+                    })
+                });
+            })
+            .then(res => res.json())
+            .then(data => console.log("Leaderboard Updated on GitHub!", data))
+            .catch(err => console.error("GitHub Save Failed:", err));
+
+        // ==========================================
+
         try { if (this.fightMusic) this.fightMusic.stop(); } catch (e) {}
         try {
             if (!this.sound.mute) {
@@ -734,6 +788,7 @@ class GameScene extends Phaser.Scene {
         });
     }
 }
+
 // ==========================================
 // INITIALIZE THE GAME
 // ==========================================
@@ -753,7 +808,7 @@ const config = {
         default: 'arcade',
         arcade: { gravity: { y: 1000 }, debug: false }
     },
-    scene: [BootScene, MainMenu, LobbyScene, CharSelectScene, DifficultyScene, GameScene] 
+    scene: [BootScene, MainMenu, LobbyScene, CharSelectScene, DifficultyScene, LeaderboardScene, GameScene] 
 };
 
 const game = new Phaser.Game(config);
